@@ -1,6 +1,6 @@
 # SeedStack Maven plugin
 
-[![Build status](https://travis-ci.org/seedstack/maven-plugin.svg?branch=master)](https://travis-ci.org/seedstack/maven-plugin) [![Coverage Status](https://coveralls.io/repos/seedstack/maven-plugin/badge.svg?branch=master)](https://coveralls.io/r/seedstack/maven-plugin?branch=master) [![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.seedstack/seedstack-maven-plugin/badge.svg?style=flat)](https://maven-badges.herokuapp.com/maven-central/org.seedstack/seedstack-maven-plugin)
+[![Build status](https://travis-ci.org/seedstack/seedstack-maven-plugin.svg?branch=master)](https://travis-ci.org/seedstack/seedstack-maven-plugin) [![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.seedstack/seedstack-maven-plugin/badge.svg?style=flat)](https://maven-badges.herokuapp.com/maven-central/org.seedstack/seedstack-maven-plugin)
 
 Maven plugin providing various goals to manage SeedStack-based artifacts.
 
