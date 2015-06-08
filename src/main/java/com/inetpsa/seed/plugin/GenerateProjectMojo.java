@@ -39,10 +39,10 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.plugin;
 import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
 
 /**
- * Defines the scaffold goal. This goal generates a SeedStack project from existing archetypes.
+ * Defines the generate goal. This goal generates a SeedStack project from existing archetypes.
  */
-@Mojo(name = "scaffold", requiresProject = false)
-public class ScaffoldMojo extends AbstractMojo {
+@Mojo(name = "generate-project", requiresProject = false)
+public class GenerateProjectMojo extends AbstractMojo {
     public static List<String> possibleTypes = Collections.unmodifiableList(new ArrayList<String>() {{
         add("web");
         add("batch");
