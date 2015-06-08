@@ -94,6 +94,28 @@
         </plugins>
     </build>
 
+	<scm>
+        <url>https://github.com/seedstack/seedstack-maven-plugin</url>
+        <connection>scm:git:git://github.com/seedstack/seedstack-maven-plugin.git</connection>
+        <developerConnection>scm:git:git@github.com:seedstack/seedstack-maven-plugin.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+    <repositories>
+        <repository>
+            <id>sonatype-nexus-staging</id>
+            <name>Sonatype Nexus Staging</name>
+            <url>https://oss.sonatype.org/content/groups/staging</url>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>sonatype-nexus-staging</id>
+            <name>Sonatype Nexus Staging</name>
+            <url>https://oss.sonatype.org/content/groups/staging</url>
+        </pluginRepository>
+    </pluginRepositories>
+
     <dependencies>
         <dependency>
             <groupId>commons-lang</groupId>
