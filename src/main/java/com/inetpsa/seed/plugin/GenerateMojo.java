@@ -9,7 +9,7 @@
  */
 package com.inetpsa.seed.plugin;
 
-import com.inetpsa.seed.plugin.components.VersionResolver;
+import com.inetpsa.seed.plugin.components.ArtifactResolver;
 import org.apache.commons.lang.StringUtils;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
@@ -40,26 +40,30 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
 
 /**
  * Defines the generate goal. This goal generates a SeedStack project from existing archetypes.
+ *
+ * @author adrien.lauer@mpsa.com
  */
-@Mojo(name = "generate-project", requiresProject = false)
-public class GenerateProjectMojo extends AbstractMojo {
+@Mojo(name = "generate", requiresProject = false)
+public class GenerateMojo extends AbstractMojo {
     public static List<String> possibleTypes = Collections.unmodifiableList(new ArrayList<String>() {{
         add("web");
         add("batch");
         add("domain");
-        add("function");
         add("rest");
     }});
 
-    @Parameter(defaultValue = "project", property = "project", required = true, readonly = true)
+    @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject mavenProject;
-    @Parameter(defaultValue = "session", property = "session", required = true, readonly = true)
+
+    @Parameter(defaultValue = "${session}", required = true, readonly = true)
     private MavenSession mavenSession;
 
     @Component
     private BuildPluginManager buildPluginManager;
+
     @Component
-    private VersionResolver versionResolver;
+    private ArtifactResolver artifactResolver;
+
     @Component
     private Prompter prompter;
 
@@ -99,7 +103,7 @@ public class GenerateProjectMojo extends AbstractMojo {
 
         if (StringUtils.isBlank(archetypeVersion)) {
             try {
-                archetypeVersion = versionResolver.getHighestVersion(mavenProject, archetypeGroupId, archetypeArtifactId, allowSnapshots);
+                archetypeVersion = artifactResolver.getHighestVersion(mavenProject, archetypeGroupId, archetypeArtifactId, allowSnapshots);
             } catch (Exception e) {
                 throw new MojoExecutionException("Unable to determine latest version of archetype, please specify it manually through the archetypeVersion property", e);
             }
