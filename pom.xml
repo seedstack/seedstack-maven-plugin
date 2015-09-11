@@ -137,7 +137,6 @@
             <groupId>org.codehaus.plexus</groupId>
             <artifactId>plexus-component-annotations</artifactId>
             <version>${plexus-component.version}</version>
-
         </dependency>
         <dependency>
             <groupId>org.codehaus.plexus</groupId>

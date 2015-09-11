@@ -13,5 +13,5 @@ package com.inetpsa.seed.plugin;
  * SeedStack useful constants.
  */
 public class SeedStackConstants {
-    public static final String mainClassName = "org.seedstack.seed.core.SeedRunner";
+    public static final String mainClassName = "org.seedstack.seed.core.SeedMain";
 }

@@ -10,7 +10,6 @@
 package com.inetpsa.seed.plugin;
 
 import com.google.common.base.Strings;
-import com.google.common.io.Files;
 import com.inetpsa.seed.plugin.components.ArtifactResolver;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Dependency;
@@ -63,13 +62,17 @@ import java.util.zip.ZipException;
  * @author adrien.lauer@gmail.com
  */
 @Mojo(name = "package", requiresProject = true, threadSafe = true, defaultPhase = LifecyclePhase.PACKAGE)
-@Execute(phase = LifecyclePhase.PROCESS_CLASSES)
+@Execute(phase = LifecyclePhase.PACKAGE)
 public class PackageMojo extends AbstractMojo {
     public static final String CAPSULE_GROUP_ID = "co.paralleluniverse";
     public static final String CAPSULE_ARTIFACT_ID = "capsule";
     public static final String MAVEN_CAPLET_ARTIFACT_ID = "capsule-maven";
     public static final String CAPSULE_CLASS = "Capsule.class";
     public static final String MAVEN_CAPLET_CLASS = "MavenCapsule.class";
+    public static final String PREMAIN_CLASS = "Premain-Class";
+    public static final String APPLICATION_CLASS = "Application-Class";
+    public static final String APPLICATION_NAME = "Application-Name";
+    public static final String ALLOW_SNAPSHOTS = "Allow-Snapshots";
 
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject mavenProject;
@@ -89,11 +92,17 @@ public class PackageMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project.build.directory}")
     private File outputDirectory;
 
-    @Parameter(defaultValue = "thin")
-    private Type capsuleType;
+    @Parameter(property = "mainClass", defaultValue = SeedStackConstants.mainClassName, required = true)
+    private String mainClass;
 
-    @Parameter
+    @Parameter(property = "capsuleVersion")
     private String capsuleVersion;
+
+    @Parameter(property = "standalone")
+    private String standalone;
+
+    @Parameter(property = "allowSnapshots")
+    private String allowSnapshots;
 
     @Component
     private BuildPluginManager buildPluginManager;
@@ -102,9 +111,8 @@ public class PackageMojo extends AbstractMojo {
     private ArtifactResolver artifactResolver;
 
     enum Type {
-        empty,
-        thin,
-        fat
+        light,
+        standalone
     }
 
     @Override
@@ -123,33 +131,38 @@ public class PackageMojo extends AbstractMojo {
         getLog().info("Packaging SeedStack application using Capsule version " + capsuleVersion);
 
         File capsuleFile;
-        switch (capsuleType) {
-            case thin:
-                try {
-                    capsuleFile = buildThin();
-                } catch (Exception e) {
-                    throw new MojoExecutionException("Unable to build capsule", e);
-                }
-
-                break;
-            default:
-                throw new MojoFailureException("Unsupported capsule type " + capsuleType);
+        if (standalone != null) {
+            try {
+                capsuleFile = buildStandalone();
+            } catch (Exception e) {
+                throw new MojoExecutionException("Unable to build standalone Capsule", e);
+            }
+        } else {
+            try {
+                capsuleFile = buildLight();
+            } catch (Exception e) {
+                throw new MojoExecutionException("Unable to build lightweight Capsule", e);
+            }
         }
 
-        helper.attachArtifact(mavenProject, capsuleFile, String.format("capsule-%s", capsuleType));
+        helper.attachArtifact(mavenProject, capsuleFile, "capsule");
     }
 
-    public File buildThin() throws IOException, ArtifactResolutionException, DependencyResolutionException {
-        File jarFile = new File(this.outputDirectory, getOutputName(Type.thin));
+    public File buildLight() throws IOException, ArtifactResolutionException, DependencyResolutionException {
+        File jarFile = new File(this.outputDirectory, getOutputName());
         JarOutputStream jarStream = new JarOutputStream(new FileOutputStream(jarFile));
+
+        // Manifest
         Map<String, String> additionalAttributes = new HashMap<String, String>();
         additionalAttributes.put("Dependencies", getDependencyString());
         additionalAttributes.put("Repositories", getRepoString());
+        addManifest(jarStream, additionalAttributes, Type.light);
 
-        addManifest(jarStream, additionalAttributes, Type.thin);
+        // Main JAR
+        File mainJarFile = new File(outputDirectory, finalName + ".jar");
+        addToJar(mainJarFile.getName(), new FileInputStream(mainJarFile), jarStream);
 
-        addCompiledProjectClasses(jarStream);
-
+        // Capsule classes
         addCapsuleClasses(jarStream);
         addMavenCapletClasses(jarStream);
 
@@ -158,18 +171,43 @@ public class PackageMojo extends AbstractMojo {
         return jarFile;
     }
 
-    private String getOutputName(Type type) {
-        return String.format("%s-%s.jar", finalName, type);
-    }
+    public File buildStandalone() throws IOException, MojoExecutionException, ArtifactResolutionException, DependencyResolutionException {
+        DependencyFilter dependencyFilter = new DependencyFilter() {
+            @Override
+            public boolean accept(DependencyNode node, List<DependencyNode> parents) {
+                return "jar".equals(node.getArtifact().getExtension());
+            }
+        };
+        File jarFile = new File(outputDirectory, getOutputName());
+        JarOutputStream jarStream = new JarOutputStream(new FileOutputStream(jarFile));
 
-    private void addCompiledProjectClasses(JarOutputStream jarStream) throws IOException {
-        for (File f : Files.fileTreeTraverser().preOrderTraversal(classesDirectory)) {
-            String path = f.getPath();
+        // Manifest
+        addManifest(jarStream, null, Type.standalone);
 
-            if (!f.isDirectory() && !path.endsWith(".DS_Store") && !path.endsWith("MANIFEST.MF") && !f.equals(classesDirectory)) {
-                addToJar(path.substring(path.indexOf("classes") + 8), new FileInputStream(f), jarStream);
+        // Main JAR
+        File mainJarFile = new File(outputDirectory, finalName + ".jar");
+        addToJar(mainJarFile.getName(), new FileInputStream(mainJarFile), jarStream);
+
+        // Dependencies
+        for (Artifact artifact : getProjectArtifacts(dependencyFilter)) {
+            getLog().debug("Adding " + artifact);
+            if (artifact.getFile() == null) {
+                throw new MojoExecutionException("Unable to find artifact " + artifact);
+            } else {
+                addToJar(artifact.getFile().getName(), new FileInputStream(artifact.getFile()), jarStream);
             }
         }
+
+        // Capsule classes
+        addCapsuleClasses(jarStream);
+
+        IOUtil.close(jarStream);
+
+        return jarFile;
+    }
+
+    private String getOutputName() {
+        return String.format("%s-capsule.jar", finalName);
     }
 
     private void addCapsuleClasses(JarOutputStream jarOutputStream) throws IOException, ArtifactResolutionException {
@@ -197,23 +235,20 @@ public class PackageMojo extends AbstractMojo {
     }
 
     private JarOutputStream addManifest(JarOutputStream jar, Map<String, String> additionalAttributes, Type type) throws IOException {
+        String capsuleMainClass = type == Type.standalone ? "Capsule" : "MavenCapsule";
         Manifest manifestBuild = new Manifest();
         Attributes mainAttributes = manifestBuild.getMainAttributes();
 
         mainAttributes.put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        mainAttributes.put(Attributes.Name.MAIN_CLASS, capsuleMainClass);
+        mainAttributes.put(new Attributes.Name(PREMAIN_CLASS), capsuleMainClass);
+        mainAttributes.put(new Attributes.Name(APPLICATION_CLASS), mainClass);
+        mainAttributes.put(new Attributes.Name(APPLICATION_NAME), this.getOutputName());
 
-        switch (type) {
-            case fat:
-                mainAttributes.put(Attributes.Name.MAIN_CLASS, "Capsule");
-            case thin:
-                mainAttributes.put(Attributes.Name.MAIN_CLASS, "MavenCapsule");
-            case empty:
-                mainAttributes.put(Attributes.Name.MAIN_CLASS, "MavenCapsule");
+        if (allowSnapshots != null) {
+            getLog().warn("Allowing SNAPSHOT dependencies in the Capsule");
+            mainAttributes.put(new Attributes.Name(ALLOW_SNAPSHOTS), "true");
         }
-
-        mainAttributes.put(new Attributes.Name("Application-Class"), SeedStackConstants.mainClassName);
-
-        mainAttributes.put(new Attributes.Name("Application-Name"), this.getOutputName(type));
 
 //        TODO String propertiesString = getSystemPropertiesString();
 //        if (propertiesString != null) mainAttributes.put(new Attributes.Name("System-Properties"), propertiesString);
@@ -257,26 +292,15 @@ public class PackageMojo extends AbstractMojo {
 
     private String getDependencyString() throws DependencyResolutionException, ArtifactResolutionException {
         StringBuilder dependenciesList = new StringBuilder();
-        List<org.eclipse.aether.graph.Dependency> managedDependencies = new ArrayList<org.eclipse.aether.graph.Dependency>();
-
-        for (Dependency dependency : mavenProject.getDependencyManagement().getDependencies()) {
-            managedDependencies.add(artifactResolver.convertDependencyToAether(dependency));
-        }
-
-        List<ArtifactResult> artifactResults = artifactResolver.resolveTransitiveArtifacts(mavenProject, artifactResolver.convertArtifactToAether(mavenProject.getArtifact()), managedDependencies, new DependencyFilter() {
+        DependencyFilter dependencyFilter = new DependencyFilter() {
             @Override
             public boolean accept(DependencyNode node, List<DependencyNode> parents) {
                 return (parents.size() == 1 && !"pom".equals(node.getArtifact().getExtension())) ||
                         (parents.size() > 1 && "pom".equals(parents.get(0).getArtifact().getExtension()));
             }
-        });
+        };
 
-        Set<Artifact> artifacts = new HashSet<Artifact>();
-        for (ArtifactResult artifactResult : artifactResults) {
-            artifacts.add(artifactResult.getArtifact());
-        }
-
-        for (org.eclipse.aether.artifact.Artifact artifact : artifacts) {
+        for (org.eclipse.aether.artifact.Artifact artifact : getProjectArtifacts(dependencyFilter)) {
             dependenciesList
                     .append(artifact.getGroupId()).append(":")
                     .append(artifact.getArtifactId()).append(":")
@@ -286,6 +310,27 @@ public class PackageMojo extends AbstractMojo {
         }
 
         return dependenciesList.toString();
+    }
 
+    private Set<Artifact> getProjectArtifacts(DependencyFilter dependencyFilter) throws DependencyResolutionException {
+        List<org.eclipse.aether.graph.Dependency> managedDependencies = new ArrayList<org.eclipse.aether.graph.Dependency>();
+
+        for (Dependency dependency : mavenProject.getDependencyManagement().getDependencies()) {
+            managedDependencies.add(artifactResolver.convertDependencyToAether(dependency));
+        }
+
+        List<ArtifactResult> artifactResults = artifactResolver.resolveTransitiveArtifacts(
+                mavenProject,
+                artifactResolver.convertArtifactToAether(mavenProject.getArtifact()),
+                managedDependencies,
+                dependencyFilter
+        );
+
+        Set<Artifact> artifacts = new HashSet<Artifact>();
+        for (ArtifactResult artifactResult : artifactResults) {
+            artifacts.add(artifactResult.getArtifact());
+        }
+
+        return artifacts;
     }
 }

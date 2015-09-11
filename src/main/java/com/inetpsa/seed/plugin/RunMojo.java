@@ -44,32 +44,35 @@ public class RunMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project.build.outputDirectory}", required = true)
     private File classesDirectory;
 
+    @Parameter(property = "mainClass", defaultValue = SeedStackConstants.mainClassName, required = true)
+    private String mainClass;
+
     @Parameter(property = "args")
     private String args;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        IsolatedThreadGroup isolatedThreadGroup = new IsolatedThreadGroup(SeedStackConstants.mainClassName);
+        IsolatedThreadGroup isolatedThreadGroup = new IsolatedThreadGroup(mainClass);
 
         Thread bootstrapThread = new Thread(isolatedThreadGroup, new Runnable() {
             public void run() {
                 try {
-                    Method main = Thread.currentThread().getContextClassLoader().loadClass(SeedStackConstants.mainClassName).getMethod("main", String[].class);
+                    Method main = Thread.currentThread().getContextClassLoader().loadClass(mainClass).getMethod("main", String[].class);
                     main.setAccessible(true);
 
                     if (!Modifier.isStatic(main.getModifiers())) {
-                        throw new MojoExecutionException("Main method of class " + SeedStackConstants.mainClassName + " is not static");
+                        throw new MojoExecutionException("Main method of class " + mainClass + " is not static");
                     }
 
                     main.invoke(null, new Object[]{CommandLineUtils.translateCommandline(args)});
                 } catch (Exception e) {
                     Thread.currentThread().getThreadGroup().uncaughtException(
                             Thread.currentThread(),
-                            new Exception("Unable to invoke main method of class " + SeedStackConstants.mainClassName, e)
+                            new Exception("Unable to invoke main method of class " + mainClass, e)
                     );
                 }
             }
-        }, SeedStackConstants.mainClassName + ".main()");
+        }, mainClass + ".main()");
 
         bootstrapThread.setContextClassLoader(new URLClassLoader(getClassPathUrls()));
 
