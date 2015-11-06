@@ -1,7 +1,5 @@
 /**
- * Copyright (c) 2013-2015 by The SeedStack authors. All rights reserved.
- *
- * This file is part of SeedStack, An enterprise-oriented full development stack.
+ * Copyright (c) 2013-2015, The SeedStack authors <http://seedstack.org>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -20,11 +18,8 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.util.cli.CommandLineUtils;
 
 import java.io.File;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -44,74 +39,62 @@ public class RunMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project.build.outputDirectory}", required = true)
     private File classesDirectory;
 
-    @Parameter(property = "mainClass", defaultValue = SeedStackConstants.mainClassName, required = true)
-    private String mainClass;
-
     @Parameter(property = "args")
     private String args;
 
+    private final IsolatedThreadGroup isolatedThreadGroup = new IsolatedThreadGroup("seedstack-app");
+    private final Object monitor = new Object();
+
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        IsolatedThreadGroup isolatedThreadGroup = new IsolatedThreadGroup(mainClass);
+        // Create an isolated launcher thread
+        Thread bootstrapThread = new Thread(isolatedThreadGroup, new LauncherRunnable(args, monitor, getLog()), "launcher");
 
-        Thread bootstrapThread = new Thread(isolatedThreadGroup, new Runnable() {
-            public void run() {
-                try {
-                    Method main = Thread.currentThread().getContextClassLoader().loadClass(mainClass).getMethod("main", String[].class);
-                    main.setAccessible(true);
-
-                    if (!Modifier.isStatic(main.getModifiers())) {
-                        throw new MojoExecutionException("Main method of class " + mainClass + " is not static");
-                    }
-
-                    main.invoke(null, new Object[]{CommandLineUtils.translateCommandline(args)});
-                } catch (Exception e) {
-                    Thread.currentThread().getThreadGroup().uncaughtException(
-                            Thread.currentThread(),
-                            new Exception("Unable to invoke main method of class " + mainClass, e)
-                    );
-                }
-            }
-        }, mainClass + ".main()");
-
+        // Start the launcher thread
         bootstrapThread.setContextClassLoader(new URLClassLoader(getClassPathUrls()));
-
         bootstrapThread.start();
 
-        joinThreads(isolatedThreadGroup);
+        // Wait for the application to launch
+        synchronized (monitor) {
+            try {
+                monitor.wait();
+            } catch (InterruptedException e) {
+                throw new MojoExecutionException("Interrupted while waiting for Seed application to launch");
+            }
+        }
 
+        // Check for any uncaught exception
         synchronized (isolatedThreadGroup) {
             if (isolatedThreadGroup.uncaughtException != null) {
                 throw new MojoExecutionException("An exception occurred while executing the Seed application", isolatedThreadGroup.uncaughtException);
             }
         }
+
+        // Join the application non-daemon threads
+        joinNonDaemonThreads(isolatedThreadGroup);
     }
 
-    private void joinThreads(ThreadGroup threadGroup) {
-        boolean found;
+    private void joinNonDaemonThreads(ThreadGroup threadGroup) {
+        boolean found = true;
 
-        do {
+        while (found) {
             found = false;
 
-            for (Thread thread : getGroupThreads(threadGroup)) {
-                if (!thread.isDaemon()) {
+            for (Thread groupThread : getGroupThreads(threadGroup)) {
+                if (!groupThread.isDaemon()) {
                     found = true;
 
                     try {
-                        thread.join();
+                        groupThread.join();
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
-
-                    if (thread.isAlive()) {
-                        getLog().warn(String.format("Unable to stop thread %s", thread));
-                    }
                 }
             }
-        } while (found);
+        }
     }
 
-    Thread[] getGroupThreads(final ThreadGroup group) {
+    private Thread[] getGroupThreads(final ThreadGroup group) {
         int nAlloc = group.activeCount();
         int n;
         Thread[] threads;
@@ -153,7 +136,7 @@ public class RunMojo extends AbstractMojo {
         return urls.toArray(new URL[urls.size()]);
     }
 
-    public void removeDuplicatesFromOutputDirectory(File outputDirectory, File originDirectory) {
+    private void removeDuplicatesFromOutputDirectory(File outputDirectory, File originDirectory) {
         if (originDirectory.isDirectory()) {
             for (String name : originDirectory.list()) {
                 File targetFile = new File(outputDirectory, name);
@@ -169,7 +152,7 @@ public class RunMojo extends AbstractMojo {
         }
     }
 
-    class IsolatedThreadGroup extends ThreadGroup {
+    private class IsolatedThreadGroup extends ThreadGroup {
         private Throwable uncaughtException;
 
         public IsolatedThreadGroup(String name) {

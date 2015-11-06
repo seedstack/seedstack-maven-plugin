@@ -1,7 +1,5 @@
 /**
- * Copyright (c) 2013-2015 by The SeedStack authors. All rights reserved.
- *
- * This file is part of SeedStack, An enterprise-oriented full development stack.
+ * Copyright (c) 2013-2015, The SeedStack authors <http://seedstack.org>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -92,14 +90,11 @@ public class PackageMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project.build.directory}")
     private File outputDirectory;
 
-    @Parameter(property = "mainClass", defaultValue = SeedStackConstants.mainClassName, required = true)
-    private String mainClass;
-
     @Parameter(property = "capsuleVersion")
     private String capsuleVersion;
 
-    @Parameter(property = "standalone")
-    private String standalone;
+    @Parameter(property = "light")
+    private String light;
 
     @Parameter(property = "allowSnapshots")
     private String allowSnapshots;
@@ -131,17 +126,17 @@ public class PackageMojo extends AbstractMojo {
         getLog().info("Packaging SeedStack application using Capsule version " + capsuleVersion);
 
         File capsuleFile;
-        if (standalone != null) {
-            try {
-                capsuleFile = buildStandalone();
-            } catch (Exception e) {
-                throw new MojoExecutionException("Unable to build standalone Capsule", e);
-            }
-        } else {
+        if (light != null) {
             try {
                 capsuleFile = buildLight();
             } catch (Exception e) {
                 throw new MojoExecutionException("Unable to build lightweight Capsule", e);
+            }
+        } else {
+            try {
+                capsuleFile = buildStandalone();
+            } catch (Exception e) {
+                throw new MojoExecutionException("Unable to build standalone Capsule", e);
             }
         }
 
@@ -242,7 +237,7 @@ public class PackageMojo extends AbstractMojo {
         mainAttributes.put(Attributes.Name.MANIFEST_VERSION, "1.0");
         mainAttributes.put(Attributes.Name.MAIN_CLASS, capsuleMainClass);
         mainAttributes.put(new Attributes.Name(PREMAIN_CLASS), capsuleMainClass);
-        mainAttributes.put(new Attributes.Name(APPLICATION_CLASS), mainClass);
+        mainAttributes.put(new Attributes.Name(APPLICATION_CLASS), SeedStackConstants.mainClassName);
         mainAttributes.put(new Attributes.Name(APPLICATION_NAME), this.getOutputName());
 
         if (allowSnapshots != null) {
