@@ -86,6 +86,20 @@
                         </execution>
                     </executions>
                 </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-release-plugin</artifactId>
+                    <version>2.5.1</version>
+                    <configuration>
+                        <pushChanges>true</pushChanges>
+                        <autoVersionSubmodules>true</autoVersionSubmodules>
+                        <scmCommentPrefix>[ci skip][release]:</scmCommentPrefix>
+                        <tagNameFormat>v@{project.version}</tagNameFormat>
+                        <useReleaseProfile>false</useReleaseProfile>
+                        <arguments>-Pdistribution-release</arguments>
+                    </configuration>
+                </plugin>
+
             </plugins>
         </pluginManagement>
         <plugins>
@@ -211,6 +225,30 @@
                     <url>http://dl.bintray.com/seedstack/jars</url>
                 </repository>
             </repositories>
+        </profile>
+        <profile>
+            <id>distribution-release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.6</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <keyname>release@seedstack.org</keyname>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 
