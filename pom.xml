@@ -18,7 +18,7 @@
 
     <groupId>org.seedstack</groupId>
     <artifactId>seedstack-maven-plugin</artifactId>
-    <version>2.1.0</version>
+    <version>2.1.1-SNAPSHOT</version>
     <packaging>maven-plugin</packaging>
 
     <properties>
@@ -123,7 +123,7 @@
         <url>https://github.com/seedstack/seedstack-maven-plugin</url>
         <connection>scm:git:git://github.com/seedstack/seedstack-maven-plugin.git</connection>
         <developerConnection>scm:git:git@github.com:seedstack/seedstack-maven-plugin.git</developerConnection>
-        <tag>v2.1.0</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <dependencies>
