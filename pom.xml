@@ -96,7 +96,7 @@
                         <scmCommentPrefix>[ci skip][release]:</scmCommentPrefix>
                         <tagNameFormat>v@{project.version}</tagNameFormat>
                         <useReleaseProfile>false</useReleaseProfile>
-                        <arguments>-Pdistribution-release</arguments>
+                        <arguments>-Pbuild-number,bintray,javadoc,maven-plugin-release</arguments>
                     </configuration>
                 </plugin>
 
@@ -227,7 +227,7 @@
             </repositories>
         </profile>
         <profile>
-            <id>distribution-release</id>
+            <id>maven-plugin-release</id>
             <build>
                 <plugins>
                     <plugin>
