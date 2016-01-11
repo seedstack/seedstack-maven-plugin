@@ -5,9 +5,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package com.inetpsa.seed.plugin;
+package org.seedstack.maven;
 
-import com.inetpsa.seed.plugin.components.ArtifactResolver;
+import org.seedstack.maven.components.ArtifactResolver;
 import org.apache.commons.lang.StringUtils;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
