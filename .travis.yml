@@ -15,4 +15,4 @@ install:
   - if [[ $TRAVIS_PULL_REQUEST = false ]] && [[ $TRAVIS_BRANCH = master ]] || [[ $TRAVIS_TAG = v* ]]; then GOAL=deploy; else GOAL=install; fi
   - if [[ $TRAVIS_TAG = v* ]]; then mvn -q -U install org.seedstack:seedstack-maven-plugin:LATEST:release; fi
 
-script: mvn -q -U -Pbuild-number,bintray,snapshots,javadoc $GOAL
+script: mvn -q -U -Pbintray,snapshots,javadoc $GOAL
