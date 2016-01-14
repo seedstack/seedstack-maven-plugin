@@ -11,7 +11,7 @@ cache:
   directories: "$HOME/.m2/repository"
 
 install:
-  - echo "<settings><servers><server><id>bintray</id><username>\${env.BINTRAY_USER}</username><password>\${env.BINTRAY_KEY}</password></server></servers></settings>" > ~/settings.xml
+  - echo "<settings><servers><server><id>bintray</id><username>\${env.BINTRAY_USER}</username><password>\${env.BINTRAY_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
   - if [[ $TRAVIS_PULL_REQUEST = false ]] && [[ $TRAVIS_BRANCH = master ]] || [[ $TRAVIS_TAG = v* ]]; then GOAL=deploy; else GOAL=install; fi
   - if [[ $TRAVIS_TAG = v* ]]; then ADDITIONAL_PROFILES=release; mvn -q -U install org.seedstack:seedstack-maven-plugin:LATEST:release; else ADDITIONAL_PROFILES=snapshots; fi
   - echo $GOAL, $ADDITIONAL_PROFILES
