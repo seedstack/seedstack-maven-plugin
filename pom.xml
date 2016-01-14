@@ -26,6 +26,11 @@
         <maven.version>3.1</maven.version>
         <plexus-component.version>1.6</plexus-component.version>
 
+        <!-- Bintray properties -->
+        <bintray.org>seedstack</bintray.org>
+        <bintray.repo>jars</bintray.repo>
+        <bintray.package>seedstack-maven-plugin</bintray.package>
+
         <compatibility.skip>true</compatibility.skip>
     </properties>
 
@@ -52,8 +57,7 @@
                             <licenseMerge>Apache 2|The Apache Software License, Version 2.0</licenseMerge>
                             <licenseMerge>Apache 2|Apache License, Version 2.0</licenseMerge>
                             <licenseMerge>Apache 2|Apache Public License 2.0</licenseMerge>
-                            <licenseMerge>CDDL 1.0|COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0
-                            </licenseMerge>
+                            <licenseMerge>CDDL 1.0|COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0</licenseMerge>
                             <licenseMerge>CPL 1.0|Common Public License Version 1.0</licenseMerge>
                             <licenseMerge>EPL 1.0|Eclipse Public License, Version 1.0</licenseMerge>
                         </licenseMerges>
@@ -75,18 +79,6 @@
                             </goals>
                         </execution>
                     </executions>
-                </plugin>
-                <plugin>
-                    <groupId>org.jfrog.buildinfo</groupId>
-                    <artifactId>artifactory-maven-plugin</artifactId>
-                    <version>2.4.0</version>
-                    <configuration>
-                        <deployProperties>
-                            <bintray.repo>seedstack/jars</bintray.repo>
-                            <bintray.package>seedstack-maven-plugin</bintray.package>
-                            <bintray.version>${project.version}</bintray.version>
-                        </deployProperties>
-                    </configuration>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -213,6 +205,31 @@
                     <url>http://dl.bintray.com/seedstack/jars</url>
                 </repository>
             </repositories>
+        </profile>
+        <profile>
+            <id>release</id>
+            <build>
+                <pluginManagement>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.jfrog.buildinfo</groupId>
+                            <artifactId>artifactory-maven-plugin</artifactId>
+                            <executions>
+                                <execution>
+                                    <id>build-info</id>
+                                    <phase>none</phase>
+                                </execution>
+                            </executions>
+                        </plugin>
+                    </plugins>
+                </pluginManagement>
+            </build>
+            <distributionManagement>
+                <repository>
+                    <id>bintray</id>
+                    <url>https://api.bintray.com/maven/${bintray.org}/${bintray.repo}/${bintray.package}/</url>
+                </repository>
+            </distributionManagement>
         </profile>
     </profiles>
 </project>
