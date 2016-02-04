@@ -8,6 +8,7 @@
 package org.seedstack.maven;
 
 import com.google.common.base.Strings;
+import org.apache.maven.model.DependencyManagement;
 import org.seedstack.maven.components.ArtifactResolver;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Dependency;
@@ -310,8 +311,11 @@ public class PackageMojo extends AbstractMojo {
     private Set<Artifact> getProjectArtifacts(DependencyFilter dependencyFilter) throws DependencyResolutionException {
         List<org.eclipse.aether.graph.Dependency> managedDependencies = new ArrayList<org.eclipse.aether.graph.Dependency>();
 
-        for (Dependency dependency : mavenProject.getDependencyManagement().getDependencies()) {
-            managedDependencies.add(artifactResolver.convertDependencyToAether(dependency));
+        DependencyManagement dependencyManagement = mavenProject.getDependencyManagement();
+        if (dependencyManagement != null) {
+            for (Dependency dependency : dependencyManagement.getDependencies()) {
+                managedDependencies.add(artifactResolver.convertDependencyToAether(dependency));
+            }
         }
 
         List<ArtifactResult> artifactResults = artifactResolver.resolveTransitiveArtifacts(
