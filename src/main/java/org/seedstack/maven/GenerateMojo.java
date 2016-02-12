@@ -45,9 +45,10 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
 public class GenerateMojo extends AbstractMojo {
     public static List<String> possibleTypes = Collections.unmodifiableList(new ArrayList<String>() {{
         add("web");
-        add("batch");
-        add("domain");
         add("rest");
+        add("cli");
+        add("domain");
+        add("batch");
     }});
 
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
