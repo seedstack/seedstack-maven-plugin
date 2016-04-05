@@ -8,10 +8,9 @@
 package org.seedstack.maven;
 
 import com.google.common.base.Strings;
-import org.apache.maven.model.DependencyManagement;
-import org.seedstack.maven.components.ArtifactResolver;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -32,6 +31,7 @@ import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.resolution.ArtifactResolutionException;
 import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.aether.resolution.DependencyResolutionException;
+import org.seedstack.maven.components.ArtifactResolver;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -41,6 +41,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -63,15 +64,21 @@ import java.util.zip.ZipException;
 @Mojo(name = "package", requiresProject = true, threadSafe = true, defaultPhase = LifecyclePhase.PACKAGE)
 @Execute(phase = LifecyclePhase.PACKAGE)
 public class PackageMojo extends AbstractMojo {
-    public static final String CAPSULE_GROUP_ID = "co.paralleluniverse";
-    public static final String CAPSULE_ARTIFACT_ID = "capsule";
-    public static final String MAVEN_CAPLET_ARTIFACT_ID = "capsule-maven";
-    public static final String CAPSULE_CLASS = "Capsule.class";
-    public static final String MAVEN_CAPLET_CLASS = "MavenCapsule.class";
-    public static final String PREMAIN_CLASS = "Premain-Class";
-    public static final String APPLICATION_CLASS = "Application-Class";
-    public static final String APPLICATION_NAME = "Application-Name";
-    public static final String ALLOW_SNAPSHOTS = "Allow-Snapshots";
+    private static final String CAPSULE_GROUP_ID = "co.paralleluniverse";
+    private static final String CAPSULE_ARTIFACT_ID = "capsule";
+    private static final String MAVEN_CAPLET_ARTIFACT_ID = "capsule-maven";
+    private static final String CAPSULE_CLASS = "Capsule.class";
+    private static final String MAVEN_CAPLET_CLASS = "MavenCapsule.class";
+    private static final String PREMAIN_CLASS = "Premain-Class";
+    private static final String APPLICATION_CLASS = "Application-Class";
+    private static final String APPLICATION_NAME = "Application-Name";
+    private static final String ALLOW_SNAPSHOTS = "Allow-Snapshots";
+    private static final String DEPENDENCIES = "Dependencies";
+    private static final String REPOSITORIES = "Repositories";
+    private static final String JVM_ARGS = "JVM-Args";
+    private static final String ENVIRONMENT_VARIABLES = "Environment-Variables";
+    private static final String SYSTEM_PROPERTIES = "System-Properties";
+    private static final String APP_CLASS_PATH = "App-Class-Path";
 
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject mavenProject;
@@ -80,13 +87,13 @@ public class PackageMojo extends AbstractMojo {
     private MavenSession mavenSession;
 
     @Parameter(defaultValue = "${project.remoteProjectRepositories}", required = true, readonly = true)
-    protected List<RemoteRepository> remoteRepositories = null;
+    private List<RemoteRepository> remoteRepositories = null;
 
     @Parameter(defaultValue = "${project.build.finalName}", required = true, readonly = true)
-    protected String finalName;
+    private String finalName;
 
     @Parameter(defaultValue = "${project.build.outputDirectory}", required = true, readonly = true)
-    protected File classesDirectory;
+    private File classesDirectory;
 
     @Parameter(defaultValue = "${project.build.directory}")
     private File outputDirectory;
@@ -99,6 +106,18 @@ public class PackageMojo extends AbstractMojo {
 
     @Parameter(property = "allowSnapshots")
     private String allowSnapshots;
+
+    @Parameter(property = "classpathEntries")
+    private List<String> classpathEntries;
+
+    @Parameter(property = "systemProperties")
+    private List<String> systemProperties;
+
+    @Parameter(property = "environmentVariables")
+    private List<String> environmentVariables;
+
+    @Parameter(property = "jvmArgs")
+    private List<String> jvmArgs;
 
     @Component
     private BuildPluginManager buildPluginManager;
@@ -144,14 +163,14 @@ public class PackageMojo extends AbstractMojo {
         helper.attachArtifact(mavenProject, capsuleFile, "capsule");
     }
 
-    public File buildLight() throws IOException, ArtifactResolutionException, DependencyResolutionException {
+    private File buildLight() throws IOException, ArtifactResolutionException, DependencyResolutionException {
         File jarFile = new File(this.outputDirectory, getOutputName());
         JarOutputStream jarStream = new JarOutputStream(new FileOutputStream(jarFile));
 
         // Manifest
         Map<String, String> additionalAttributes = new HashMap<String, String>();
-        additionalAttributes.put("Dependencies", getDependencyString());
-        additionalAttributes.put("Repositories", getRepoString());
+        additionalAttributes.put(DEPENDENCIES, getMavenDependencyString());
+        additionalAttributes.put(REPOSITORIES, getRepoString());
         addManifest(jarStream, additionalAttributes, Type.light);
 
         // Main JAR
@@ -167,7 +186,7 @@ public class PackageMojo extends AbstractMojo {
         return jarFile;
     }
 
-    public File buildStandalone() throws IOException, MojoExecutionException, ArtifactResolutionException, DependencyResolutionException {
+    private File buildStandalone() throws IOException, MojoExecutionException, ArtifactResolutionException, DependencyResolutionException {
         DependencyFilter dependencyFilter = new DependencyFilter() {
             @Override
             public boolean accept(DependencyNode node, List<DependencyNode> parents) {
@@ -178,7 +197,8 @@ public class PackageMojo extends AbstractMojo {
         JarOutputStream jarStream = new JarOutputStream(new FileOutputStream(jarFile));
 
         // Manifest
-        addManifest(jarStream, null, Type.standalone);
+        Map<String, String> additionalAttributes = new HashMap<String, String>();
+        addManifest(jarStream, additionalAttributes, Type.standalone);
 
         // Main JAR
         File mainJarFile = new File(outputDirectory, finalName + ".jar");
@@ -245,14 +265,27 @@ public class PackageMojo extends AbstractMojo {
             getLog().warn("Allowing SNAPSHOT dependencies in the Capsule");
             mainAttributes.put(new Attributes.Name(ALLOW_SNAPSHOTS), "true");
         }
-
-//        TODO String propertiesString = getSystemPropertiesString();
-//        if (propertiesString != null) mainAttributes.put(new Attributes.Name("System-Properties"), propertiesString);
-
-        // additional attributes
+        if (!isEmpty(classpathEntries)) {
+            mainAttributes.put(new Attributes.Name(APP_CLASS_PATH), asSpacedString(classpathEntries));
+        }
+        if (!isEmpty(systemProperties)) {
+            mainAttributes.put(new Attributes.Name(SYSTEM_PROPERTIES), asSpacedString(systemProperties));
+        }
+        if (!isEmpty(environmentVariables)) {
+            mainAttributes.put(new Attributes.Name(ENVIRONMENT_VARIABLES), asSpacedString(environmentVariables));
+        }
+        if (!isEmpty(jvmArgs)) {
+            mainAttributes.put(new Attributes.Name(JVM_ARGS), asSpacedString(jvmArgs));
+        }
         if (additionalAttributes != null) {
             for (Map.Entry<String, String> entry : additionalAttributes.entrySet()) {
-                mainAttributes.put(new Attributes.Name(entry.getKey()), entry.getValue());
+                Attributes.Name name = new Attributes.Name(entry.getKey());
+                String existingValue = (String) mainAttributes.get(name);
+                if (!isBlank(existingValue)) {
+                    mainAttributes.put(name, asSpacedString(existingValue, entry.getValue()));
+                } else {
+                    mainAttributes.put(name, entry.getValue());
+                }
             }
         }
 
@@ -286,7 +319,7 @@ public class PackageMojo extends AbstractMojo {
         return repoList.toString();
     }
 
-    private String getDependencyString() throws DependencyResolutionException, ArtifactResolutionException {
+    private String getMavenDependencyString() throws DependencyResolutionException, ArtifactResolutionException {
         StringBuilder dependenciesList = new StringBuilder();
         DependencyFilter dependencyFilter = new DependencyFilter() {
             @Override
@@ -331,5 +364,36 @@ public class PackageMojo extends AbstractMojo {
         }
 
         return artifacts;
+    }
+
+    private String asSpacedString(String... values) {
+        return asSpacedString(Arrays.asList(values));
+    }
+
+    private String asSpacedString(List<String> values) {
+        StringBuilder sb = new StringBuilder();
+        for (String value : values) {
+            if (!isBlank(value)) {
+                sb.append(value.trim()).append(" ");
+            }
+        }
+        String result = sb.toString();
+        if (result.endsWith(" ")) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isEmpty();
+    }
+
+    private boolean isEmpty(List<String> values) {
+        for (String value : values) {
+            if (!isBlank(value)) {
+                return false;
+            }
+        }
+        return true;
     }
 }
