@@ -9,8 +9,6 @@ package org.seedstack.maven;
 
 import com.google.common.base.Strings;
 import org.apache.maven.execution.MavenSession;
-import org.apache.maven.model.Dependency;
-import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -31,6 +29,8 @@ import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.resolution.ArtifactResolutionException;
 import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.aether.resolution.DependencyResolutionException;
+import org.eclipse.aether.util.filter.AndDependencyFilter;
+import org.eclipse.aether.util.filter.ScopeDependencyFilter;
 import org.seedstack.maven.components.ArtifactResolver;
 
 import java.io.ByteArrayInputStream;
@@ -40,13 +40,10 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -205,7 +202,7 @@ public class PackageMojo extends AbstractMojo {
         addToJar(mainJarFile.getName(), new FileInputStream(mainJarFile), jarStream);
 
         // Dependencies
-        for (Artifact artifact : getProjectArtifacts(dependencyFilter)) {
+        for (Artifact artifact : artifactResolver.resolveProjectArtifacts(mavenProject, excludeScopes(dependencyFilter, "test", "provided"))) {
             getLog().debug("Adding " + artifact);
             if (artifact.getFile() == null) {
                 throw new MojoExecutionException("Unable to find artifact " + artifact);
@@ -329,7 +326,7 @@ public class PackageMojo extends AbstractMojo {
             }
         };
 
-        for (org.eclipse.aether.artifact.Artifact artifact : getProjectArtifacts(dependencyFilter)) {
+        for (org.eclipse.aether.artifact.Artifact artifact : artifactResolver.resolveProjectArtifacts(mavenProject, excludeScopes(dependencyFilter, "test", "provided"))) {
             dependenciesList
                     .append(artifact.getGroupId()).append(":")
                     .append(artifact.getArtifactId()).append(":")
@@ -339,31 +336,6 @@ public class PackageMojo extends AbstractMojo {
         }
 
         return dependenciesList.toString();
-    }
-
-    private Set<Artifact> getProjectArtifacts(DependencyFilter dependencyFilter) throws DependencyResolutionException {
-        List<org.eclipse.aether.graph.Dependency> managedDependencies = new ArrayList<org.eclipse.aether.graph.Dependency>();
-
-        DependencyManagement dependencyManagement = mavenProject.getDependencyManagement();
-        if (dependencyManagement != null) {
-            for (Dependency dependency : dependencyManagement.getDependencies()) {
-                managedDependencies.add(artifactResolver.convertDependencyToAether(dependency));
-            }
-        }
-
-        List<ArtifactResult> artifactResults = artifactResolver.resolveTransitiveArtifacts(
-                mavenProject,
-                artifactResolver.convertArtifactToAether(mavenProject.getArtifact()),
-                managedDependencies,
-                dependencyFilter
-        );
-
-        Set<Artifact> artifacts = new HashSet<Artifact>();
-        for (ArtifactResult artifactResult : artifactResults) {
-            artifacts.add(artifactResult.getArtifact());
-        }
-
-        return artifacts;
     }
 
     private String asSpacedString(String... values) {
@@ -395,5 +367,13 @@ public class PackageMojo extends AbstractMojo {
             }
         }
         return true;
+    }
+
+    private DependencyFilter excludeScopes(DependencyFilter dependencyFilter, String... scopes) {
+        if (dependencyFilter != null) {
+            return new AndDependencyFilter(dependencyFilter, new ScopeDependencyFilter(scopes));
+        } else {
+            return new ScopeDependencyFilter(scopes);
+        }
     }
 }

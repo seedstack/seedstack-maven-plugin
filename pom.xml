@@ -57,7 +57,8 @@
                             <licenseMerge>Apache 2|The Apache Software License, Version 2.0</licenseMerge>
                             <licenseMerge>Apache 2|Apache License, Version 2.0</licenseMerge>
                             <licenseMerge>Apache 2|Apache Public License 2.0</licenseMerge>
-                            <licenseMerge>CDDL 1.0|COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0</licenseMerge>
+                            <licenseMerge>CDDL 1.0|COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0
+                            </licenseMerge>
                             <licenseMerge>CPL 1.0|Common Public License Version 1.0</licenseMerge>
                             <licenseMerge>EPL 1.0|Eclipse Public License, Version 1.0</licenseMerge>
                         </licenseMerges>
@@ -137,6 +138,11 @@
             <groupId>org.codehaus.plexus</groupId>
             <artifactId>plexus-utils</artifactId>
             <version>3.0.22</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.aether</groupId>
+            <artifactId>aether-util</artifactId>
+            <version>0.9.0.M2</version>
         </dependency>
         <dependency>
             <groupId>org.twdata.maven</groupId>
