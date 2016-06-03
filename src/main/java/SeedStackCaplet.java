@@ -7,7 +7,6 @@
  */
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.file.Path;
 import java.security.CodeSource;
@@ -16,9 +15,11 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 
 public class SeedStackCaplet extends Capsule {
+    private static final Map.Entry<String, List<String>> RAW_ATTR_APP_CLASS_PATH = ATTRIBUTE("App-Class-Path", T_LIST(T_STRING()), null, true, "A list of entries that are added to the classpath on runtime");
     private static final String CLASSPATH = "capsule.classpath";
     private final String homePath = getHomePath();
     private final String startupPath = getStartupPath();
@@ -59,33 +60,30 @@ public class SeedStackCaplet extends Capsule {
     @Override
     @SuppressWarnings("unchecked")
     protected <T> T attribute(Map.Entry<String, T> attr) {
-        if (attr == ATTR_APP_CLASS_PATH) {
-            final List<Object> appClasspath = new ArrayList<>(super.attribute(ATTR_APP_CLASS_PATH));
+        if (attr.getKey().equals(RAW_ATTR_APP_CLASS_PATH.getKey())) {
+            final List<String> rawClasspath = new ArrayList<>(super.attribute(RAW_ATTR_APP_CLASS_PATH));
+            final Set<Object> resolvedClasspath = new HashSet<>();
+
+            resolvedClasspath.add(lookup("*.jar", ATTR_APP_CLASS_PATH));
 
             String runtimeClasspath = System.getProperty(CLASSPATH);
             if (runtimeClasspath != null && !runtimeClasspath.isEmpty()) {
-                Collections.addAll(appClasspath, runtimeClasspath.split(File.pathSeparator));
+                Collections.addAll(rawClasspath, runtimeClasspath.split(File.pathSeparator));
             }
 
-            final List<Object> resolvedClasspath = new ArrayList<>();
-            for (Object o : appClasspath) {
-                if (o instanceof Path) {
-                    resolvedClasspath.add(resolvePath(o.toString()));
-                } else if (o instanceof String) {
-                    resolvedClasspath.add(resolvePath((String) o));
-                } else {
-                    resolvedClasspath.add(o);
-                }
+            for (String rawPath : rawClasspath) {
+                resolvedClasspath.addAll(resolvePath(rawPath));
             }
 
-            // deduplicate list of normalized paths
-            return (T) new ArrayList<>(new HashSet<>(resolvedClasspath));
+            return (T) new ArrayList<>(resolvedClasspath);
         } else {
             return super.attribute(attr);
         }
     }
 
-    private String resolvePath(String path) {
+    private Set<Path> resolvePath(String path) {
+        HashSet<Path> result = new HashSet<>();
+
         if (path.startsWith("~")) {
             if (homePath == null) {
                 throw new RuntimeException("Unable to resolve path containing home reference: " + path);
@@ -101,10 +99,26 @@ public class SeedStackCaplet extends Capsule {
             file = new File(startupPath, path);
         }
 
-        try {
-            return file.getAbsoluteFile().getCanonicalPath();
-        } catch (IOException e) {
-            throw new RuntimeException("Unable to resolve path: " + path, e);
+        String filePath = file.getPath();
+        if (filePath.endsWith("/*") || filePath.endsWith("\\*")) {
+            // Cannot use a FilenameFilter here because the capsule won't load the anonymous (or inner) class
+            File[] files = file.getParentFile().listFiles();
+            if (files != null) {
+                for (File candidate : files) {
+                    String candidatePath = candidate.getPath();
+                    if (candidatePath.endsWith(".jar") || candidatePath.endsWith(".JAR")) {
+                        result.add(normalizePath(candidate));
+                    }
+                }
+            }
+        } else {
+            result.add(normalizePath(file));
         }
+
+        return result;
+    }
+
+    private Path normalizePath(File file) {
+        return file.getAbsoluteFile().toPath();
     }
 }
