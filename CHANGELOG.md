@@ -1,3 +1,8 @@
+# Version 2.3.0 (2016-?-?)
+
+* [new] Goal `tool` executes any Seed tool present in the application by name (starting from Seed 3.0.0+).
+* [new] Goal `config` is a shortcut to the config Seed tool.
+
 # Version 2.2.4 (2016-06-03)
 
 * [new] Add the ability to resolve `*` wildcards in capsule external classpath entries (to load all JARs from the specified path)

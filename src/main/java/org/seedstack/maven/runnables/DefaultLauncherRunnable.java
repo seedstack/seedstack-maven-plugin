@@ -5,20 +5,22 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package org.seedstack.maven;
+package org.seedstack.maven.runnables;
 
+import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.logging.Log;
-import org.codehaus.plexus.util.cli.CommandLineUtils;
+import org.seedstack.maven.SeedStackConstants;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 
-public class LauncherRunnable implements Runnable {
-    private final String commandLine;
+public class DefaultLauncherRunnable implements Runnable {
+    private final String[] args;
     private final Object monitor;
     private final Log log;
 
-    public LauncherRunnable(String commandLine, Object monitor, Log log) {
-        this.commandLine = commandLine;
+    public DefaultLauncherRunnable(String[] args, Object monitor, Log log) {
+        this.args = args;
         this.monitor = monitor;
         this.log = log;
     }
@@ -32,9 +34,7 @@ public class LauncherRunnable implements Runnable {
                 public void run() {
                     try {
                         log.info("Stopping Seed application");
-
                         shutdown(seedLauncher);
-
                         log.info("Seed application stopped");
                     } catch (Exception e) {
                         log.error("Seed application failed to shutdown properly", e);
@@ -42,10 +42,8 @@ public class LauncherRunnable implements Runnable {
                 }
             });
 
-            log.info("Starting Seed application");
-
-            launch(seedLauncher, CommandLineUtils.translateCommandline(commandLine));
-
+            log.info("Launching Seed application " + " with arguments " + Arrays.toString(args));
+            launch(seedLauncher, args);
             log.info("Seed application started");
         } catch (Exception e) {
             Thread.currentThread().getThreadGroup().uncaughtException(Thread.currentThread(), e);
@@ -57,8 +55,12 @@ public class LauncherRunnable implements Runnable {
     }
 
     private Object getSeedLauncher() throws Exception {
-        Method getLauncherMethod = Thread.currentThread().getContextClassLoader().loadClass(SeedStackConstants.mainClassName).getMethod("getLauncher");
-        return getLauncherMethod.invoke(null);
+        try {
+            Method getLauncherMethod = Thread.currentThread().getContextClassLoader().loadClass(SeedStackConstants.mainClassName).getMethod("getLauncher");
+            return getLauncherMethod.invoke(null);
+        } catch (Exception e) {
+            throw new MojoExecutionException("Seed application doesn't support launchers (you need at least Seed 2.1.0)");
+        }
     }
 
     private void launch(Object seedLauncher, String[] args) throws Exception {

@@ -13,17 +13,17 @@ import org.apache.maven.plugins.annotations.Execute;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
-import org.seedstack.maven.runnables.DefaultLauncherRunnable;
+import org.seedstack.maven.runnables.ToolLauncherRunnable;
 
 /**
- * Defines the run goal. This goal runs a SeedStack project.
+ * Defines the config goal. This goal runs the config Seed tool which displays all configuration options for the application.
  */
-@Mojo(name = "run", requiresProject = true, threadSafe = true, defaultPhase = LifecyclePhase.VALIDATE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
+@Mojo(name = "config", requiresProject = true, threadSafe = true, defaultPhase = LifecyclePhase.VALIDATE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 @Execute(phase = LifecyclePhase.PROCESS_CLASSES)
-public class RunMojo extends AbstractExecutableMojo {
+public class ConfigMojo extends AbstractExecutableMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        runnable = new DefaultLauncherRunnable(getArgs(), getMonitor(), getLog());
+        runnable = new ToolLauncherRunnable("config", getArgs(), getMonitor(), getLog());
         super.execute();
     }
 }
