@@ -7,7 +7,6 @@
  */
 package org.seedstack.maven;
 
-import org.seedstack.maven.components.ArtifactResolver;
 import org.apache.commons.lang.StringUtils;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
@@ -20,9 +19,8 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.components.interactivity.Prompter;
 import org.codehaus.plexus.components.interactivity.PrompterException;
+import org.seedstack.maven.components.ArtifactResolver;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import static org.twdata.maven.mojoexecutor.MojoExecutor.artifactId;
@@ -43,14 +41,6 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
  */
 @Mojo(name = "generate", requiresProject = false)
 public class GenerateMojo extends AbstractMojo {
-    public static List<String> possibleTypes = Collections.unmodifiableList(new ArrayList<String>() {{
-        add("web");
-        add("rest");
-        add("cli");
-        add("domain");
-        add("batch");
-    }});
-
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject mavenProject;
 
@@ -86,6 +76,11 @@ public class GenerateMojo extends AbstractMojo {
 
         if (StringUtils.isBlank(archetypeArtifactId)) {
             if (StringUtils.isBlank(type)) {
+                List<String> possibleTypes = artifactResolver.getArchetypeList(
+                        mavenProject,
+                        archetypeGroupId,
+                        artifactResolver.getHighestVersion(mavenProject, "org.seedstack", "distribution", allowSnapshots)
+                );
                 try {
                     String answer = prompter.prompt("Enter the project type", possibleTypes);
                     if (answer == null || !possibleTypes.contains(answer)) {

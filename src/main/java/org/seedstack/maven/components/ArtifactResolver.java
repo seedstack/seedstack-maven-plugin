@@ -19,9 +19,13 @@ import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.graph.DependencyFilter;
 import org.eclipse.aether.graph.Exclusion;
+import org.eclipse.aether.metadata.DefaultMetadata;
+import org.eclipse.aether.metadata.Metadata;
 import org.eclipse.aether.resolution.ArtifactRequest;
 import org.eclipse.aether.resolution.ArtifactResolutionException;
 import org.eclipse.aether.resolution.ArtifactResult;
+import org.eclipse.aether.resolution.MetadataRequest;
+import org.eclipse.aether.resolution.MetadataResult;
 import org.eclipse.aether.resolution.VersionRangeRequest;
 import org.eclipse.aether.resolution.VersionRangeResult;
 import org.eclipse.aether.version.Version;
@@ -66,6 +70,30 @@ public class ArtifactResolver {
         }
 
         return highestVersion.toString();
+    }
+
+    public List<String> getArchetypeList(MavenProject mavenProject, String groupId, String version) {
+        RepositorySystemSession session = mavenProject.getProjectBuildingRequest().getRepositorySession();
+
+        List<MetadataRequest> metadataRequests = new ArrayList<>();
+        MetadataRequest metadataRequest = new MetadataRequest();
+        metadataRequest.setMetadata(new DefaultMetadata(groupId, "maven-metadata.xml", Metadata.Nature.RELEASE_OR_SNAPSHOT));
+        metadataRequests.add(metadataRequest);
+
+        List<MetadataResult> metadataResults;
+        try {
+            metadataResults = repositorySystem.resolveMetadata(session, metadataRequests);
+        } catch (Exception e) {
+            throw new RuntimeException(String.format("Unable to resolve archetype list for %s:*:%s", groupId, version), e);
+        }
+
+        if (!metadataResults.isEmpty()) {
+            for (MetadataResult metadataResult : metadataResults) {
+                System.out.println(metadataResult);
+            }
+        }
+
+        return new ArrayList<>();
     }
 
     public ArtifactResult resolveArtifact(MavenProject mavenProject, String groupId, String artifactId, String type, String classifier, String version) throws ArtifactResolutionException {

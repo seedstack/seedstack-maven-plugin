@@ -1,7 +1,8 @@
-# Version 2.3.0 (2016-?-?)
+# Version 2.3.0 (2016-12-13)
 
 * [new] Goal `tool` executes any Seed tool present in the application by name (starting from Seed 3.0.0+).
 * [new] Goal `config` is a shortcut to the config Seed tool.
+* [new] Dynamic fetches the list of archetypes from Maven repository.
 
 # Version 2.2.4 (2016-06-03)
 
