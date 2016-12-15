@@ -7,8 +7,6 @@
  */
 package org.seedstack.maven;
 
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Profile;
@@ -24,8 +22,10 @@ import org.apache.maven.project.ProjectBuilder;
 import org.apache.maven.project.ProjectBuildingException;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -76,10 +76,9 @@ public class ReleaseMojo extends AbstractMojo {
         executeVersionsPlugin("set", executionMavenProject);
 
         boolean shouldRevert = false;
-        Iterable<MavenProject> transformedModules = Iterables.concat(
-                Lists.newArrayList(executionMavenProject),
-                getReactorModules("", executionMavenProject).values()
-        );
+        List<MavenProject> transformedModules = new ArrayList<>();
+        transformedModules.add(executionMavenProject);
+        transformedModules.addAll(getReactorModules("", executionMavenProject).values());
         getLog().info("Checking transformed modules");
         for (MavenProject transformedModule : transformedModules) {
             try {
