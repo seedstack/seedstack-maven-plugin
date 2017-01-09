@@ -1,3 +1,7 @@
+# Version 2.3.1 (2017-01-09)
+
+* [fix] Fix auto-detection of possible project archetypes.
+
 # Version 2.3.0 (2016-12-13)
 
 * [new] Goal `tool` executes any Seed tool present in the application by name (starting from Seed 3.0.0+).

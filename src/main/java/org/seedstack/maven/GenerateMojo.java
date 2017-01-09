@@ -7,7 +7,11 @@
  */
 package org.seedstack.maven;
 
+import edu.emory.mathcs.backport.java.util.Collections;
 import org.apache.commons.lang.StringUtils;
+import org.apache.maven.archetype.ArchetypeManager;
+import org.apache.maven.archetype.catalog.Archetype;
+import org.apache.maven.archetype.catalog.ArchetypeCatalog;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.BuildPluginManager;
@@ -21,7 +25,9 @@ import org.codehaus.plexus.components.interactivity.Prompter;
 import org.codehaus.plexus.components.interactivity.PrompterException;
 import org.seedstack.maven.components.ArtifactResolver;
 
-import java.util.List;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.twdata.maven.mojoexecutor.MojoExecutor.artifactId;
 import static org.twdata.maven.mojoexecutor.MojoExecutor.configuration;
@@ -54,6 +60,9 @@ public class GenerateMojo extends AbstractMojo {
     private ArtifactResolver artifactResolver;
 
     @Component
+    private ArchetypeManager archetypeManager;
+
+    @Component
     private Prompter prompter;
 
     @Override
@@ -76,17 +85,15 @@ public class GenerateMojo extends AbstractMojo {
 
         if (StringUtils.isBlank(archetypeArtifactId)) {
             if (StringUtils.isBlank(type)) {
-                List<String> possibleTypes = artifactResolver.getArchetypeList(
-                        mavenProject,
-                        archetypeGroupId,
-                        artifactResolver.getHighestVersion(mavenProject, "org.seedstack", "distribution", allowSnapshots)
-                );
+                Set<String> possibleTypes = findProjectTypes();
+
                 try {
-                    String answer = prompter.prompt("Enter the project type", possibleTypes);
-                    if (answer == null || !possibleTypes.contains(answer)) {
-                        return;
+                    if (possibleTypes.isEmpty()) {
+                        type = prompter.prompt("Enter the project type");
                     } else {
-                        type = answer;
+                        ArrayList<String> list = new ArrayList<>(possibleTypes);
+                        Collections.sort(list);
+                        type = prompter.prompt("Enter the project type", list);
                     }
                 } catch (PrompterException e) {
                     throw new MojoExecutionException("Project type is required", e);
@@ -134,5 +141,21 @@ public class GenerateMojo extends AbstractMojo {
                 ),
 
                 executionEnvironment(mavenProject, mavenSession, buildPluginManager));
+    }
+
+    private Set<String> findProjectTypes() {
+        Set<String> possibleTypes = new HashSet<>();
+        getLog().info("Searching for SeedStack archetypes in catalog");
+        ArchetypeCatalog remoteCatalog = archetypeManager.getRemoteCatalog();
+
+        for (Archetype archetype : remoteCatalog.getArchetypes()) {
+            if ("org.seedstack".equals(archetype.getGroupId())) {
+                String artifactId = archetype.getArtifactId();
+                if (artifactId.endsWith("-archetype")) {
+                    possibleTypes.add(artifactId.substring(0, artifactId.length() - 10));
+                }
+            }
+        }
+        return possibleTypes;
     }
 }
