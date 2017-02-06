@@ -1,3 +1,8 @@
+# Version 2.3.2 (2017-02-06)
+
+* [new] Detect and use the latest version of Maven archetype plugin when generating a project.
+* [new] Abort release if parent is still a SNAPSHOT.
+
 # Version 2.3.1 (2017-01-09)
 
 * [fix] Fix auto-detection of possible project archetypes.

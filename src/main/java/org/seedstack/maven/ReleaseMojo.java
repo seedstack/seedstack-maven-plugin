@@ -59,15 +59,19 @@ public class ReleaseMojo extends AbstractMojo {
         String currentVersion = executionMavenProject.getVersion();
 
         if (isProjectDirty(getReactorModules("", executionMavenProject))) {
-            throw new MojoFailureException("A POM transformation is already in progress, commit and revert it before executing the release goal");
+            throw new MojoFailureException("Cannot continue, a POM transformation is already in progress, commit and revert it before executing the release goal");
         }
 
         if (!executionMavenProject.equals(getLocalRoot(executionMavenProject))) {
-            throw new MojoFailureException("Release goal must be executed from the local project root");
+            throw new MojoFailureException("Cannot continue, release goal must be executed from the local project root");
         }
 
         if (!currentVersion.endsWith(SNAPSHOT_SUFFIX)) {
-            throw new MojoFailureException("Project version is not a SNAPSHOT, aborting");
+            throw new MojoFailureException("Cannot continue, project version is not a SNAPSHOT");
+        }
+
+        if (executionMavenProject.hasParent() && executionMavenProject.getParent().getVersion().endsWith(SNAPSHOT_SUFFIX)) {
+            throw new MojoFailureException("Cannot continue, parent project is still a SNAPSHOT");
         }
 
         String newVersion = currentVersion.substring(0, currentVersion.length() - SNAPSHOT_SUFFIX.length());
