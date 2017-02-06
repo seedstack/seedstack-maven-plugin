@@ -47,6 +47,8 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
  */
 @Mojo(name = "generate", requiresProject = false)
 public class GenerateMojo extends AbstractMojo {
+    private static final String ARCHETYPE_PLUGIN_GROUP_ID = "org.apache.maven.plugins";
+    private static final String ARCHETYPE_PLUGIN_ARTIFACT_ID = "maven-archetype-plugin";
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject mavenProject;
 
@@ -129,7 +131,15 @@ public class GenerateMojo extends AbstractMojo {
         mavenSession.getExecutionProperties().put("groupId", groupId);
         mavenSession.getExecutionProperties().put("artifactId", artifactId);
 
-        executeMojo(plugin(groupId("org.apache.maven.plugins"), artifactId("maven-archetype-plugin"), version("2.2")),
+        String pluginVersion;
+        try {
+            pluginVersion = artifactResolver.getHighestVersion(mavenProject, ARCHETYPE_PLUGIN_GROUP_ID, ARCHETYPE_PLUGIN_ARTIFACT_ID, false);
+        } catch (Exception e) {
+            getLog().warn("Unable to determine latest version of archetype plugin, falling back to 2.4");
+            pluginVersion = "2.4";
+        }
+
+        executeMojo(plugin(groupId(ARCHETYPE_PLUGIN_GROUP_ID), artifactId(ARCHETYPE_PLUGIN_ARTIFACT_ID), version(pluginVersion)),
 
                 goal("generate"),
 
