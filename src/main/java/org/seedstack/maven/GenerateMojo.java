@@ -7,7 +7,6 @@
  */
 package org.seedstack.maven;
 
-import edu.emory.mathcs.backport.java.util.Collections;
 import org.apache.commons.lang.StringUtils;
 import org.apache.maven.archetype.ArchetypeManager;
 import org.apache.maven.archetype.catalog.Archetype;
@@ -26,6 +25,7 @@ import org.codehaus.plexus.components.interactivity.PrompterException;
 import org.seedstack.maven.components.ArtifactResolver;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 

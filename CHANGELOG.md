@@ -1,3 +1,9 @@
+# Version 2.4.0 (2017-02-09)
+
+* [new] New goal `effective-config` to dump effective configuration of the project as YAML.
+* [new] New goal `effective-test-config` to dump effective test configuration of the project as YAML.
+* [new] New goal `crypt` to crypt password using the configured master key store of the application.
+
 # Version 2.3.2 (2017-02-06)
 
 * [new] Detect and use the latest version of Maven archetype plugin when generating a project.

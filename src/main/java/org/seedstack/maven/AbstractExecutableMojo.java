@@ -21,6 +21,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -32,11 +33,14 @@ public class AbstractExecutableMojo extends AbstractMojo {
     private MavenProject project;
     @Parameter(defaultValue = "${project.build.outputDirectory}", required = true)
     private File classesDirectory;
+    @Parameter(defaultValue = "${project.build.testOutputDirectory}", required = true)
+    private File testClassesDirectory;
     @Parameter(property = "args")
     private String args;
 
     private final IsolatedThreadGroup isolatedThreadGroup = new IsolatedThreadGroup("seed-app");
     private final Object monitor = new Object();
+    private boolean testMode = false;
     protected Runnable runnable;
 
     @Override
@@ -66,6 +70,10 @@ public class AbstractExecutableMojo extends AbstractMojo {
 
         // Join the application non-daemon threads
         joinNonDaemonThreads(isolatedThreadGroup);
+    }
+
+    protected void enableTestMode() {
+        this.testMode = true;
     }
 
     protected Object getMonitor() {
@@ -118,28 +126,44 @@ public class AbstractExecutableMojo extends AbstractMojo {
         List<URL> urls = new ArrayList<URL>();
 
         try {
-            // Project resources
-            for (Resource resource : this.project.getResources()) {
-                File directory = new File(resource.getDirectory());
-                urls.add(directory.toURI().toURL());
-                removeDuplicatesFromOutputDirectory(this.classesDirectory, directory);
+            if (testMode) {
+                // Project test resources
+                addResources(this.testClassesDirectory, this.project.getTestResources(), urls);
+
+                // Project test classes
+                urls.add(this.testClassesDirectory.toURI().toURL());
             }
+
+            // Project resources
+            addResources(this.classesDirectory, this.project.getResources(), urls);
 
             // Project classes
             urls.add(this.classesDirectory.toURI().toURL());
 
-            // Project dependencies
-            for (Artifact artifact : this.project.getArtifacts()) {
-                File file = artifact.getFile();
-                if (file.getName().endsWith(".jar")) {
-                    urls.add(file.toURI().toURL());
-                }
-            }
+            // Project dependencies (scope is dependent upon the @Mojo annotation and the already executed phase)
+            addArtifacts(this.project.getArtifacts(), urls);
         } catch (MalformedURLException e) {
             throw new MojoExecutionException("Unable to build classpath", e);
         }
 
         return urls.toArray(new URL[urls.size()]);
+    }
+
+    private void addArtifacts(Collection<Artifact> artifacts, List<URL> urls) throws MalformedURLException {
+        for (Artifact artifact : artifacts) {
+            File file = artifact.getFile();
+            if (file.getName().endsWith(".jar")) {
+                urls.add(file.toURI().toURL());
+            }
+        }
+    }
+
+    private void addResources(File classesDirectory, List<Resource> resources, List<URL> urls) throws MalformedURLException {
+        for (Resource resource : resources) {
+            File directory = new File(resource.getDirectory());
+            urls.add(directory.toURI().toURL());
+            removeDuplicatesFromOutputDirectory(classesDirectory, directory);
+        }
     }
 
     private void removeDuplicatesFromOutputDirectory(File outputDirectory, File originDirectory) {
