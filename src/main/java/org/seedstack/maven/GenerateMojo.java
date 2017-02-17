@@ -112,8 +112,7 @@ public class GenerateMojo extends AbstractMojo {
             }
         }
 
-        // Using deprecated method to programmatically add a property to mojo execution
-        mavenSession.getExecutionProperties().setProperty("version", version);
+        mavenSession.getUserProperties().setProperty("version", version);
 
         String groupId = mavenSession.getUserProperties().getProperty("groupId");
         String artifactId = mavenSession.getUserProperties().getProperty("artifactId");
@@ -128,15 +127,16 @@ public class GenerateMojo extends AbstractMojo {
             throw new MojoExecutionException("Generated project group id and artifact id are required", e);
         }
 
-        mavenSession.getExecutionProperties().put("groupId", groupId);
-        mavenSession.getExecutionProperties().put("artifactId", artifactId);
+        mavenSession.getUserProperties().put("groupId", groupId);
+        mavenSession.getUserProperties().put("artifactId", artifactId);
 
         String pluginVersion;
         try {
             pluginVersion = artifactResolver.getHighestVersion(mavenProject, ARCHETYPE_PLUGIN_GROUP_ID, ARCHETYPE_PLUGIN_ARTIFACT_ID, false);
+            getLog().info("Using the latest version of archetype plugin: " + pluginVersion);
         } catch (Exception e) {
-            getLog().warn("Unable to determine latest version of archetype plugin, falling back to 2.4");
-            pluginVersion = "2.4";
+            getLog().warn("Unable to determine latest version of archetype plugin, falling back to 3.0.0");
+            pluginVersion = "3.0.0";
         }
 
         executeMojo(plugin(groupId(ARCHETYPE_PLUGIN_GROUP_ID), artifactId(ARCHETYPE_PLUGIN_ARTIFACT_ID), version(pluginVersion)),

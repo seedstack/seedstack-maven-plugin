@@ -1,3 +1,8 @@
+# Version 2.4.1 (2017-02-17)
+
+* [fix] Display the cause of the error when launching the application or a tool.
+* [fix] Fix asking for the generated project properties twice.
+
 # Version 2.4.0 (2017-02-09)
 
 * [new] New goal `effective-config` to dump effective configuration of the project as YAML.

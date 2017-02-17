@@ -56,7 +56,7 @@ public class ToolLauncherRunnable implements Runnable {
             Method getLauncherMethod = Thread.currentThread().getContextClassLoader().loadClass(SeedStackConstants.mainClassName).getMethod("getToolLauncher", String.class);
             return getLauncherMethod.invoke(null, tool);
         } catch (Exception e) {
-            throw new MojoExecutionException("Seed application doesn't support tools (you need at least Seed 3.0.0)");
+            throw new MojoExecutionException("Cannot launch SeedStack tool", e);
         }
     }
 
