@@ -1,3 +1,7 @@
+# Version 2.4.2 (2017-04-24)
+
+* [fix] Don't automatically run package phase before package goal.
+
 # Version 2.4.1 (2017-02-17)
 
 * [fix] Display the cause of the error when launching the application or a tool.
