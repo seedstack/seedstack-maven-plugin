@@ -1,3 +1,7 @@
+# Version 2.4.3 (2017-05-02)
+
+* [fix] Correctly sets `java.class.path` system property before running application with `run` goal.
+
 # Version 2.4.2 (2017-04-24)
 
 * [fix] Don't automatically run package phase before package goal.
