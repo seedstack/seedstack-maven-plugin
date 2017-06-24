@@ -41,9 +41,7 @@ public class ConsoleUIInquirer implements Inquirer {
             if (groupLabel != null) {
                 System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a(groupLabel).reset());
             }
-            for (Map.Entry<String, Object> result : processQuestionGroup(questionGroup).entrySet()) {
-                answers.put(String.format("%s.%s", questionGroup.getName(), result.getKey()), result.getValue());
-            }
+            answers.put(questionGroup.getName(), processQuestionGroup(questionGroup));
         }
         System.out.println();
         return answers;

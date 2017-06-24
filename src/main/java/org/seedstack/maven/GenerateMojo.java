@@ -192,26 +192,24 @@ public class GenerateMojo extends AbstractMojo {
             }
         }
 
-        String fileName = file.getName();
-        if (fileName.contains(".tpl")) {
+        if (file.isFile() && file.canWrite()) {
             getLog().info("Rendering template " + file.getPath());
             try {
-                String absolutePath = file.getAbsolutePath();
+                String absolutePath = file.getCanonicalFile().getAbsolutePath();
                 PebbleTemplate template = engine.getTemplate(absolutePath);
                 StringWriter stringWriter = new StringWriter();
 
                 template.evaluate(stringWriter, vars);
                 String renderedContent = stringWriter.toString();
                 if (renderedContent.trim().length() > 0) {
-                    try (Writer writer = new OutputStreamWriter(new FileOutputStream(absolutePath.replace(".tpl", "")), StandardCharsets.UTF_8)) {
+                    try (Writer writer = new OutputStreamWriter(new FileOutputStream(absolutePath), StandardCharsets.UTF_8)) {
                         writer.write(renderedContent);
                     }
                 } else {
                     getLog().info("Rendered content is empty, no output file is being generated");
-                }
-
-                if (!file.delete()) {
-                    getLog().warn("Unable to delete template after rendering, useless files may be still be present in project");
+                    if (!file.delete()) {
+                        getLog().warn("Unable to delete template, useless files may be still be present in project");
+                    }
                 }
             } catch (PebbleException | IOException e) {
                 getLog().error("Unable to render template, resulting project might be unusable", e);
