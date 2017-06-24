@@ -1,5 +1,10 @@
 # Version 2.4.3 (2017-05-02)
 
+* [new] Colorized, interactive prompter thanks to [ConsoleUI](https://github.com/awegmann/consoleui).
+* [new] Supports [Pebble](http://www.mitchellbosecke.com/pebble/home) template language in archetypes.
+
+# Version 2.4.3 (2017-05-02)
+
 * [fix] Correctly sets `java.class.path` system property before running application with `run` goal.
 
 # Version 2.4.2 (2017-04-24)

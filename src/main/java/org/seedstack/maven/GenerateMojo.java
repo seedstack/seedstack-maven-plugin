@@ -7,6 +7,9 @@
  */
 package org.seedstack.maven;
 
+import com.mitchellbosecke.pebble.PebbleEngine;
+import com.mitchellbosecke.pebble.error.PebbleException;
+import com.mitchellbosecke.pebble.template.PebbleTemplate;
 import org.apache.commons.lang.StringUtils;
 import org.apache.maven.archetype.ArchetypeManager;
 import org.apache.maven.archetype.catalog.Archetype;
@@ -20,13 +23,21 @@ import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.components.interactivity.Prompter;
-import org.codehaus.plexus.components.interactivity.PrompterException;
 import org.seedstack.maven.components.ArtifactResolver;
+import org.seedstack.maven.components.Prompter;
+import org.seedstack.maven.components.PrompterException;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static org.twdata.maven.mojoexecutor.MojoExecutor.artifactId;
@@ -151,6 +162,54 @@ public class GenerateMojo extends AbstractMojo {
                 ),
 
                 executionEnvironment(mavenProject, mavenSession, buildPluginManager));
+
+        File projectDir = new File("." + File.separator + artifactId);
+        if (projectDir.exists() && projectDir.canWrite()) {
+            PebbleEngine engine = new PebbleEngine.Builder().build();
+            HashMap<String, Object> vars = new HashMap<>();
+            renderTemplates(projectDir, engine, vars);
+        }
+    }
+
+    private void renderTemplates(File file, PebbleEngine engine, Map<String, Object> vars) {
+        if (!file.exists()) {
+            return;
+        }
+
+        if (file.isDirectory() && !Files.isSymbolicLink(file.toPath())) {
+            File[] files = file.listFiles();
+            if (files != null) {
+                for (File c : files) {
+                    renderTemplates(c, engine, vars);
+                }
+            }
+        }
+
+        String fileName = file.getName();
+        if (fileName.contains(".tpl")) {
+            getLog().info("Rendering template " + file.getPath());
+            try {
+                String absolutePath = file.getAbsolutePath();
+                PebbleTemplate template = engine.getTemplate(absolutePath);
+                StringWriter stringWriter = new StringWriter();
+
+                template.evaluate(stringWriter, vars);
+                String renderedContent = stringWriter.toString();
+                if (renderedContent.trim().length() > 0) {
+                    try (Writer writer = new FileWriter(absolutePath.replace(".tpl", ""))) {
+                        writer.write(renderedContent);
+                    }
+                } else {
+                    getLog().info("Rendered content is empty, no output file is being generated");
+                }
+
+                if (!file.delete()) {
+                    getLog().warn("Unable to delete template after rendering, useless additional files may be present");
+                }
+            } catch (PebbleException | IOException e) {
+                getLog().error("Unable to render template, resulting project might be unusable", e);
+            }
+        }
     }
 
     private Set<String> findProjectTypes() {
