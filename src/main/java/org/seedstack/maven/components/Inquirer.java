@@ -7,10 +7,14 @@
  */
 package org.seedstack.maven.components;
 
+import java.net.URL;
 import java.util.List;
+import java.util.Map;
 
-public interface Prompter {
-    String prompt(String message) throws PrompterException;
+public interface Inquirer {
+    Map<String, Object> inquire(URL inquiryURL) throws InquirerException;
 
-    String prompt(String message, List<String> possibleValues) throws PrompterException;
+    String ask(String message) throws InquirerException;
+
+    String ask(String message, List<String> possibleValues) throws InquirerException;
 }

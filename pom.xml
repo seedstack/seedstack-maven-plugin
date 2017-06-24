@@ -14,7 +14,7 @@
     <parent>
         <groupId>org.seedstack.poms</groupId>
         <artifactId>parent-internal</artifactId>
-        <version>3.0.0</version>
+        <version>3.1.0-SNAPSHOT</version>
     </parent>
 
     <groupId>org.seedstack</groupId>
@@ -64,7 +64,8 @@
                             <licenseMerge>BSD|BSD 3-Clause License</licenseMerge>
                             <licenseMerge>BSD|BSD style modified by Coverity</licenseMerge>
                             <licenseMerge>BSD|The BSD License</licenseMerge>
-                            <licenseMerge>CDDL 1.0|COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0</licenseMerge>
+                            <licenseMerge>CDDL 1.0|COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0
+                            </licenseMerge>
                             <licenseMerge>CPL 1.0|Common Public License Version 1.0</licenseMerge>
                             <licenseMerge>EPL 1.0|Eclipse Public License, Version 1.0</licenseMerge>
                             <licenseMerge>MIT|MIT License</licenseMerge>
@@ -194,6 +195,17 @@
             <groupId>de.codeshelf.consoleui</groupId>
             <artifactId>consoleui</artifactId>
             <version>0.0.9</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

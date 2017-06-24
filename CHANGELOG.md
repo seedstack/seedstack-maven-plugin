@@ -1,7 +1,8 @@
-# Version 2.4.3 (2017-05-02)
+# Version 2.5.0 (2017-07-30)
 
 * [new] Colorized, interactive prompter thanks to [ConsoleUI](https://github.com/awegmann/consoleui).
 * [new] Supports [Pebble](http://www.mitchellbosecke.com/pebble/home) template language in archetypes.
+* [new] Ability to ask questions if a JSON question file is present at the root of the generated project (answers can be used in templates). 
 
 # Version 2.4.3 (2017-05-02)
 

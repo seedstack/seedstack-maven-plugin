@@ -20,7 +20,7 @@ public class DefaultLauncherRunnable implements Runnable {
     private final Log log;
 
     public DefaultLauncherRunnable(String[] args, Object monitor, Log log) {
-        this.args = args;
+        this.args = args == null ? null : args.clone();
         this.monitor = monitor;
         this.log = log;
     }

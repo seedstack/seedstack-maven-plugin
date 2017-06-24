@@ -24,32 +24,16 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.seedstack.maven.components.ArtifactResolver;
-import org.seedstack.maven.components.Prompter;
-import org.seedstack.maven.components.PrompterException;
+import org.seedstack.maven.components.Inquirer;
+import org.seedstack.maven.components.InquirerException;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.StringWriter;
-import java.io.Writer;
+import java.io.*;
+import java.net.MalformedURLException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
-import static org.twdata.maven.mojoexecutor.MojoExecutor.artifactId;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.configuration;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.element;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.executeMojo;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.executionEnvironment;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.goal;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.groupId;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.name;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.plugin;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
 
 /**
  * Defines the generate goal. This goal generates a SeedStack project from existing archetypes.
@@ -76,7 +60,7 @@ public class GenerateMojo extends AbstractMojo {
     private ArchetypeManager archetypeManager;
 
     @Component
-    private Prompter prompter;
+    private Inquirer inquirer;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
@@ -102,13 +86,13 @@ public class GenerateMojo extends AbstractMojo {
 
                 try {
                     if (possibleTypes.isEmpty()) {
-                        type = prompter.prompt("Enter the project type");
+                        type = inquirer.ask("Enter the project type");
                     } else {
                         ArrayList<String> list = new ArrayList<>(possibleTypes);
                         Collections.sort(list);
-                        type = prompter.prompt("Enter the project type", list);
+                        type = inquirer.ask("Enter the project type", list);
                     }
-                } catch (PrompterException e) {
+                } catch (InquirerException e) {
                     throw new MojoExecutionException("Project type is required", e);
                 }
             }
@@ -129,12 +113,12 @@ public class GenerateMojo extends AbstractMojo {
         String artifactId = mavenSession.getUserProperties().getProperty("artifactId");
         try {
             if (StringUtils.isBlank(groupId)) {
-                groupId = prompter.prompt("Generated project group id");
+                groupId = inquirer.ask("Generated project group id");
             }
             if (StringUtils.isBlank(artifactId)) {
-                artifactId = prompter.prompt("Generated project artifact id");
+                artifactId = inquirer.ask("Generated project artifact id");
             }
-        } catch (PrompterException e) {
+        } catch (InquirerException e) {
             throw new MojoExecutionException("Generated project group id and artifact id are required", e);
         }
 
@@ -167,6 +151,29 @@ public class GenerateMojo extends AbstractMojo {
         if (projectDir.exists() && projectDir.canWrite()) {
             PebbleEngine engine = new PebbleEngine.Builder().build();
             HashMap<String, Object> vars = new HashMap<>();
+
+            // Put useful values in vars
+            vars.put("project.type", type);
+            vars.put("project.groupId", groupId);
+            vars.put("project.artifactId", artifactId);
+            vars.put("project.version", version);
+            vars.put("archetype.groupId", archetypeGroupId);
+            vars.put("archetype.artifactId", archetypeArtifactId);
+            vars.put("archetype.version", archetypeVersion);
+
+            // Inquire from user if a question file is present
+            try {
+                File questionFile = new File(projectDir, "questions.json");
+                if (questionFile.exists() && questionFile.canRead()) {
+                    vars.putAll(inquirer.inquire(questionFile.toURI().toURL()));
+                    if (!questionFile.delete()) {
+                        getLog().warn("Unable to delete question file, useless files may be still be present in project");
+                    }
+                }
+            } catch (MalformedURLException | InquirerException e) {
+                getLog().error("Unable to process question file, resulting project might be unusable", e);
+            }
+
             renderTemplates(projectDir, engine, vars);
         }
     }
@@ -196,7 +203,7 @@ public class GenerateMojo extends AbstractMojo {
                 template.evaluate(stringWriter, vars);
                 String renderedContent = stringWriter.toString();
                 if (renderedContent.trim().length() > 0) {
-                    try (Writer writer = new FileWriter(absolutePath.replace(".tpl", ""))) {
+                    try (Writer writer = new OutputStreamWriter(new FileOutputStream(absolutePath.replace(".tpl", "")), StandardCharsets.UTF_8)) {
                         writer.write(renderedContent);
                     }
                 } else {
@@ -204,7 +211,7 @@ public class GenerateMojo extends AbstractMojo {
                 }
 
                 if (!file.delete()) {
-                    getLog().warn("Unable to delete template after rendering, useless additional files may be present");
+                    getLog().warn("Unable to delete template after rendering, useless files may be still be present in project");
                 }
             } catch (PebbleException | IOException e) {
                 getLog().error("Unable to render template, resulting project might be unusable", e);

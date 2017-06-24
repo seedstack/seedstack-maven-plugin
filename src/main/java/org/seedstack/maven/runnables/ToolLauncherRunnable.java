@@ -22,7 +22,7 @@ public class ToolLauncherRunnable implements Runnable {
 
     public ToolLauncherRunnable(String tool, String[] args, Object monitor, Log log) {
         this.tool = tool;
-        this.args = args;
+        this.args = args == null ? null : args.clone();
         this.monitor = monitor;
         this.log = log;
     }

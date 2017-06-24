@@ -7,23 +7,23 @@
  */
 package org.seedstack.maven.components;
 
-public class PrompterException extends Exception {
-    public PrompterException() {
+public class AnswerValidationException extends InquirerException {
+    public AnswerValidationException() {
     }
 
-    public PrompterException(String message) {
+    public AnswerValidationException(String message) {
         super(message);
     }
 
-    public PrompterException(String message, Throwable cause) {
+    public AnswerValidationException(String message, Throwable cause) {
         super(message, cause);
     }
 
-    public PrompterException(Throwable cause) {
+    public AnswerValidationException(Throwable cause) {
         super(cause);
     }
 
-    public PrompterException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
+    public AnswerValidationException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
         super(message, cause, enableSuppression, writableStackTrace);
     }
 }

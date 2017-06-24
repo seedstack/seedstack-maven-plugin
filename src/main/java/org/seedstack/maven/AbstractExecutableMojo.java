@@ -7,6 +7,7 @@
  */
 package org.seedstack.maven;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.model.Resource;
 import org.apache.maven.plugin.AbstractMojo;
@@ -50,6 +51,7 @@ public class AbstractExecutableMojo extends AbstractMojo {
     protected Runnable runnable;
 
     @Override
+    @SuppressFBWarnings(value = {"UW_UNCOND_WAIT", "WA_NOT_IN_LOOP"}, justification = "Cannot know when the application is started")
     public void execute() throws MojoExecutionException, MojoFailureException {
         // Create an isolated thread
         Thread bootstrapThread = new Thread(isolatedThreadGroup, runnable, "main");
@@ -208,7 +210,9 @@ public class AbstractExecutableMojo extends AbstractMojo {
                     File targetFile = new File(outputDirectory, name);
                     if (targetFile.exists() && targetFile.canWrite()) {
                         if (!targetFile.isDirectory()) {
-                            targetFile.delete();
+                            if (!targetFile.delete()) {
+                                getLog().warn("Unable to delete duplicate " + targetFile.getAbsolutePath());
+                            }
                         } else {
                             removeDuplicatesFromOutputDirectory(targetFile,
                                     new File(originDirectory, name));
