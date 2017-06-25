@@ -8,6 +8,7 @@
 package org.seedstack.maven.components.inquirer;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -19,6 +20,8 @@ public class Question {
     private String message;
     private List<Condition> conditions = new ArrayList<>();
     private List<Value> values = new ArrayList<>();
+    @JsonProperty("default")
+    private String defaultValue;
     private Type type = Type.STRING;
 
     public Question() {
@@ -62,6 +65,14 @@ public class Question {
 
     public void setValues(List<Value> values) {
         this.values = new ArrayList<>(values);
+    }
+
+    public String getDefaultValue() {
+        return defaultValue;
+    }
+
+    public void setDefaultValue(String defaultValue) {
+        this.defaultValue = defaultValue;
     }
 
     public Type getType() {

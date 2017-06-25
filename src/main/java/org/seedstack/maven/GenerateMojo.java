@@ -152,14 +152,20 @@ public class GenerateMojo extends AbstractMojo {
             PebbleEngine engine = new PebbleEngine.Builder().build();
             HashMap<String, Object> vars = new HashMap<>();
 
-            // Put useful values in vars
-            vars.put("project.type", type);
-            vars.put("project.groupId", groupId);
-            vars.put("project.artifactId", artifactId);
-            vars.put("project.version", version);
-            vars.put("archetype.groupId", archetypeGroupId);
-            vars.put("archetype.artifactId", archetypeArtifactId);
-            vars.put("archetype.version", archetypeVersion);
+            // Put project values in vars
+            HashMap<String, Object> projectVars = new HashMap<>();
+            projectVars.put("type", type);
+            projectVars.put("groupId", groupId);
+            projectVars.put("artifactId", artifactId);
+            projectVars.put("version", version);
+            vars.put("project", projectVars);
+
+            // Put archetype values in vars
+            HashMap<String, Object> archetypeVars = new HashMap<>();
+            archetypeVars.put("groupId", archetypeGroupId);
+            archetypeVars.put("artifactId", archetypeArtifactId);
+            archetypeVars.put("version", archetypeVersion);
+            vars.put("archetype", archetypeVars);
 
             // Inquire from user if a question file is present
             try {

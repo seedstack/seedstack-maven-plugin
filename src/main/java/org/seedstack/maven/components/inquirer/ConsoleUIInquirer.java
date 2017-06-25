@@ -130,12 +130,13 @@ public class ConsoleUIInquirer implements Inquirer {
         PromptBuilder promptBuilder = consolePrompt.getPromptBuilder();
         String message = question.getMessage();
         String name = question.getName();
+        String defaultValue = question.getDefaultValue();
         switch (question.getStyle()) {
             case CONFIRM:
-                addConfirmation(promptBuilder, name, message);
+                addConfirmation(promptBuilder, name, message, defaultValue);
                 break;
             case INPUT:
-                addInput(promptBuilder, name, message);
+                addInput(promptBuilder, name, message, defaultValue);
                 break;
             case CHECKBOX:
                 addCheckbox(promptBuilder, name, message, question.getValues());
@@ -241,17 +242,23 @@ public class ConsoleUIInquirer implements Inquirer {
         checkboxPromptBuilder.addPrompt();
     }
 
-    private void addInput(PromptBuilder promptBuilder, String name, String message) {
-        promptBuilder.createInputPrompt()
+    private void addInput(PromptBuilder promptBuilder, String name, String message, String defaultValue) {
+        InputValueBuilder inputValueBuilder = promptBuilder.createInputPrompt()
                 .name(name)
-                .message(message)
-                .addPrompt();
+                .message(message);
+        if (defaultValue != null) {
+            inputValueBuilder.defaultValue(defaultValue);
+        }
+        inputValueBuilder.addPrompt();
     }
 
-    private void addConfirmation(PromptBuilder promptBuilder, String name, String message) {
-        promptBuilder.createConfirmPromp()
+    private void addConfirmation(PromptBuilder promptBuilder, String name, String message, String defaultValue) {
+        ConfirmPromptBuilder confirmPromptBuilder = promptBuilder.createConfirmPromp()
                 .name(name)
-                .message(message)
-                .addPrompt();
+                .message(message);
+        if (defaultValue != null) {
+            confirmPromptBuilder.defaultValue(ConfirmChoice.ConfirmationValue.valueOf(defaultValue.toUpperCase(Locale.ENGLISH)));
+        }
+        confirmPromptBuilder.addPrompt();
     }
 }
