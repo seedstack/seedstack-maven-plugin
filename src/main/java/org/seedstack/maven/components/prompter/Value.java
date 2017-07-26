@@ -5,7 +5,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package org.seedstack.maven.components.inquirer;
+package org.seedstack.maven.components.prompter;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class Value {
     private String name;
@@ -14,6 +17,10 @@ public class Value {
     private boolean separator;
 
     public Value() {
+    }
+
+    public Value(String label) {
+        this.label = label;
     }
 
     public String getName() {
@@ -46,6 +53,14 @@ public class Value {
 
     public void setSeparator(boolean separator) {
         this.separator = separator;
+    }
+
+    public static List<Value> convertList(List<String> values) {
+        List<Value> result = new ArrayList<>();
+        for (String value : values) {
+            result.add(new Value(value));
+        }
+        return result;
     }
 }
 

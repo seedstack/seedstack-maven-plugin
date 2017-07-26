@@ -20,7 +20,6 @@ import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.graph.DependencyFilter;
 import org.eclipse.aether.resolution.*;
 import org.eclipse.aether.version.Version;
-import org.seedstack.maven.components.ArtifactResolver;
 
 import java.util.HashSet;
 import java.util.Set;

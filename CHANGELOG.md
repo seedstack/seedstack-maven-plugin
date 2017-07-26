@@ -3,6 +3,8 @@
 * [new] Colorized, interactive prompter thanks to [ConsoleUI](https://github.com/awegmann/consoleui).
 * [new] Supports [Pebble](http://www.mitchellbosecke.com/pebble/home) template language in archetypes.
 * [new] Ability to ask questions if a JSON question file is present at the root of the generated project (answers can be used in templates). 
+* [new] Distribution information can now be specified on the generate goal allowing to generate projects based on a custom distribution.
+* [new] Resolve distribution highest version before listing project types when generating (avoid listing obsolete types).
 
 # Version 2.4.3 (2017-05-02)
 

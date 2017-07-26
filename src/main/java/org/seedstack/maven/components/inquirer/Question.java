@@ -9,6 +9,7 @@ package org.seedstack.maven.components.inquirer;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.seedstack.maven.components.prompter.Value;
 
 import java.util.ArrayList;
 import java.util.Collections;

@@ -5,16 +5,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package org.seedstack.maven.components;
+package org.seedstack.maven.components.inquirer;
 
 import java.net.URL;
-import java.util.List;
 import java.util.Map;
 
 public interface Inquirer {
     Map<String, Object> inquire(URL inquiryURL) throws InquirerException;
 
-    String ask(String message) throws InquirerException;
-
-    String ask(String message, List<String> possibleValues) throws InquirerException;
+    Object ask(Question question) throws InquirerException;
 }

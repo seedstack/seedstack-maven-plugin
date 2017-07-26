@@ -28,7 +28,7 @@ import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.aether.resolution.DependencyResolutionException;
 import org.eclipse.aether.util.filter.AndDependencyFilter;
 import org.eclipse.aether.util.filter.ScopeDependencyFilter;
-import org.seedstack.maven.components.ArtifactResolver;
+import org.seedstack.maven.components.resolver.ArtifactResolver;
 
 import java.io.*;
 import java.util.Arrays;

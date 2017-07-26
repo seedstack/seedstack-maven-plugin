@@ -23,17 +23,39 @@ import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
-import org.seedstack.maven.components.ArtifactResolver;
-import org.seedstack.maven.components.Inquirer;
-import org.seedstack.maven.components.InquirerException;
+import org.seedstack.maven.components.inquirer.Inquirer;
+import org.seedstack.maven.components.inquirer.InquirerException;
+import org.seedstack.maven.components.prompter.PromptException;
+import org.seedstack.maven.components.prompter.Prompter;
+import org.seedstack.maven.components.prompter.Value;
+import org.seedstack.maven.components.resolver.ArtifactResolver;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
-import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.artifactId;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.configuration;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.element;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.executeMojo;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.executionEnvironment;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.goal;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.groupId;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.name;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.plugin;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
 
 /**
  * Defines the generate goal. This goal generates a SeedStack project from existing archetypes.
@@ -60,51 +82,77 @@ public class GenerateMojo extends AbstractMojo {
     private ArchetypeManager archetypeManager;
 
     @Component
-    private Inquirer inquirer;
+    private Prompter prompter;
+
+    @Component
+    private Inquirer inquire;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         String type = mavenSession.getUserProperties().getProperty("type"),
+                distributionGroupId = mavenSession.getUserProperties().getProperty("distributionGroupId", "org.seedstack"),
+                distributionArtifactId = mavenSession.getUserProperties().getProperty("distributionArtifactId", "distribution"),
                 version = mavenSession.getUserProperties().getProperty("version"),
                 archetypeGroupId = mavenSession.getUserProperties().getProperty("archetypeGroupId"),
                 archetypeArtifactId = mavenSession.getUserProperties().getProperty("archetypeArtifactId"),
                 archetypeVersion = mavenSession.getUserProperties().getProperty("archetypeVersion");
-
         boolean allowSnapshots = !mavenSession.getUserProperties().getProperty("allowSnapshots", "false").equals("false");
 
-        if (StringUtils.isBlank(version)) {
-            version = "1.0.0-SNAPSHOT";
-        }
 
         if (StringUtils.isBlank(archetypeGroupId)) {
-            archetypeGroupId = "org.seedstack";
+            archetypeGroupId = distributionGroupId;
         }
 
         if (StringUtils.isBlank(archetypeArtifactId)) {
             if (StringUtils.isBlank(type)) {
-                Set<String> possibleTypes = findProjectTypes();
-
+                // Resolve archetype version using SeedStack highest version
+                if (StringUtils.isBlank(archetypeVersion)) {
+                    getLog().info("Resolving latest " + (allowSnapshots ? "snapshot" : "release") + " of SeedStack (" + distributionGroupId + ")");
+                    archetypeVersion = artifactResolver.getHighestVersion(mavenProject, distributionGroupId, distributionArtifactId, allowSnapshots);
+                    getLog().info("Resolved version " + archetypeVersion);
+                }
+                Set<String> possibleTypes = findProjectTypes(archetypeGroupId, archetypeVersion);
                 try {
-                    if (possibleTypes.isEmpty()) {
-                        type = inquirer.ask("Enter the project type");
-                    } else {
+                    // We have a list of possible types, let the user choose
+                    if (!possibleTypes.isEmpty()) {
                         ArrayList<String> list = new ArrayList<>(possibleTypes);
                         Collections.sort(list);
-                        type = inquirer.ask("Enter the project type", list);
+                        list.add("custom archetype");
+                        type = prompter.promptList("Choose the project type", Value.convertList(list));
                     }
-                } catch (InquirerException e) {
-                    throw new MojoExecutionException("Project type is required", e);
+                    // No possible types or the user wants to input a custom archetype
+                    if (possibleTypes.isEmpty() || "custom archetype".equals(type)) {
+                        // Ask for archetype group id (defaults to distribution group id)
+                        archetypeGroupId = prompter.promptInput("Enter the archetype group id", archetypeGroupId);
+                        // Ask for archetype artifact id
+                        archetypeArtifactId = prompter.promptInput("Enter the archetype artifact id", null);
+                        // Ask for archetype version (defaults to latest)
+                        try {
+                            archetypeVersion = artifactResolver.getHighestVersion(mavenProject, archetypeGroupId, archetypeArtifactId, allowSnapshots);
+                        } catch (Exception e) {
+                            archetypeVersion = null;
+                        }
+                        archetypeVersion = prompter.promptInput("Enter the archetype version", archetypeVersion);
+                    } else {
+                        archetypeArtifactId = String.format("%s-archetype", type);
+                    }
+                } catch (PromptException e) {
+                    throw new MojoExecutionException("Cannot continue without choosing an archetype/project type", e);
                 }
+            } else {
+                archetypeArtifactId = String.format("%s-archetype", type);
             }
-            archetypeArtifactId = String.format("%s-archetype", type);
         }
 
+        // If needed, find the latest version of the archetype
         if (StringUtils.isBlank(archetypeVersion)) {
-            try {
-                archetypeVersion = artifactResolver.getHighestVersion(mavenProject, archetypeGroupId, archetypeArtifactId, allowSnapshots);
-            } catch (Exception e) {
-                throw new MojoExecutionException("Unable to determine latest version of archetype, please specify it manually through the archetypeVersion property", e);
-            }
+            getLog().info("Resolving latest " + (allowSnapshots ? "snapshot" : "release") + " of archetype " + archetypeGroupId + ":" + archetypeArtifactId);
+            archetypeVersion = artifactResolver.getHighestVersion(mavenProject, archetypeGroupId, archetypeArtifactId, allowSnapshots);
+            getLog().info("Resolved version " + archetypeVersion);
+        }
+
+        if (StringUtils.isBlank(version)) {
+            version = "1.0.0-SNAPSHOT";
         }
 
         mavenSession.getUserProperties().setProperty("version", version);
@@ -113,12 +161,12 @@ public class GenerateMojo extends AbstractMojo {
         String artifactId = mavenSession.getUserProperties().getProperty("artifactId");
         try {
             if (StringUtils.isBlank(groupId)) {
-                groupId = inquirer.ask("Generated project group id");
+                groupId = prompter.promptInput("Generated project group id", null);
             }
             if (StringUtils.isBlank(artifactId)) {
-                artifactId = inquirer.ask("Generated project artifact id");
+                artifactId = prompter.promptInput("Generated project artifact id", null);
             }
-        } catch (InquirerException e) {
+        } catch (PromptException e) {
             throw new MojoExecutionException("Generated project group id and artifact id are required", e);
         }
 
@@ -171,7 +219,7 @@ public class GenerateMojo extends AbstractMojo {
             try {
                 File questionFile = new File(projectDir, "questions.json");
                 if (questionFile.exists() && questionFile.canRead()) {
-                    vars.putAll(inquirer.inquire(questionFile.toURI().toURL()));
+                    vars.putAll(inquire.inquire(questionFile.toURI().toURL()));
                     if (!questionFile.delete()) {
                         getLog().warn("Unable to delete question file, useless files may be still be present in project");
                     }
@@ -223,13 +271,26 @@ public class GenerateMojo extends AbstractMojo {
         }
     }
 
-    private Set<String> findProjectTypes() {
+    private Set<String> findProjectTypes(String archetypeGroupId, String archetypeVersion) {
         Set<String> possibleTypes = new HashSet<>();
-        getLog().info("Searching for SeedStack archetypes in catalog");
-        ArchetypeCatalog remoteCatalog = archetypeManager.getRemoteCatalog();
+        getLog().info("Searching for archetypes in remote catalog");
+        possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getRemoteCatalog()));
 
-        for (Archetype archetype : remoteCatalog.getArchetypes()) {
-            if ("org.seedstack".equals(archetype.getGroupId())) {
+        if (possibleTypes.isEmpty()) {
+            getLog().info("No remote archetype found with version " + archetypeVersion + ", trying the local catalog");
+            possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getDefaultLocalCatalog()));
+        }
+        if (possibleTypes.isEmpty()) {
+            getLog().info("No suitable archetype found");
+        }
+
+        return possibleTypes;
+    }
+
+    private Set<String> findArchetypes(String archetypeGroupId, String archetypeVersion, ArchetypeCatalog catalog) {
+        Set<String> possibleTypes = new HashSet<>();
+        for (Archetype archetype : catalog.getArchetypes()) {
+            if (archetypeGroupId.equals(archetype.getGroupId()) && archetypeVersion.equals(archetype.getVersion())) {
                 String artifactId = archetype.getArtifactId();
                 if (artifactId.endsWith("-archetype")) {
                     possibleTypes.add(artifactId.substring(0, artifactId.length() - 10));

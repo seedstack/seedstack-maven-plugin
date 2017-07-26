@@ -8,21 +8,24 @@
 package org.seedstack.maven.components.inquirer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.codeshelf.consoleui.elements.ConfirmChoice;
-import de.codeshelf.consoleui.prompt.*;
-import de.codeshelf.consoleui.prompt.builder.*;
 import org.codehaus.plexus.component.annotations.Component;
+import org.codehaus.plexus.component.annotations.Requirement;
 import org.fusesource.jansi.Ansi;
-import org.seedstack.maven.components.AnswerValidationException;
-import org.seedstack.maven.components.Inquirer;
-import org.seedstack.maven.components.InquirerException;
+import org.seedstack.maven.components.prompter.PromptException;
+import org.seedstack.maven.components.prompter.Prompter;
 
+import javax.inject.Inject;
 import java.io.IOException;
 import java.net.URL;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 @Component(role = Inquirer.class)
 public class ConsoleUIInquirer implements Inquirer {
+    @Requirement
+    private Prompter prompter;
     private ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -47,41 +50,7 @@ public class ConsoleUIInquirer implements Inquirer {
         return answers;
     }
 
-    @Override
-    public String ask(String message) throws InquirerException {
-        ConsolePrompt consolePrompt = new ConsolePrompt();
-        InputValueBuilder input = consolePrompt
-                .getPromptBuilder()
-                .createInputPrompt()
-                .name("input")
-                .message(message);
-        try {
-            return ((InputResult) consolePrompt.prompt(input.addPrompt().build()).get("input")).getInput();
-        } catch (IOException e) {
-            throw new InquirerException(e);
-        }
-    }
-
-    @Override
-    public String ask(String message, List<String> possibleValues) throws InquirerException {
-        ConsolePrompt consolePrompt = new ConsolePrompt();
-        ListPromptBuilder list = consolePrompt
-                .getPromptBuilder()
-                .createListPrompt()
-                .name("list")
-                .message(message);
-        for (String possibleValue : possibleValues) {
-            list.newItem(possibleValue).text(possibleValue).add();
-        }
-        try {
-            return ((ListResult) consolePrompt.prompt(list.addPrompt().build()).get("list")).getSelectedId();
-        } catch (IOException e) {
-            throw new InquirerException(e);
-        }
-    }
-
     private Map<String, Object> processQuestionGroup(QuestionGroup questionGroup) throws InquirerException {
-        ConsolePrompt consolePrompt = new ConsolePrompt();
         Map<String, Object> answers = new HashMap<>();
         for (Question question : questionGroup.getQuestions()) {
             boolean shouldAsk = true;
@@ -91,23 +60,43 @@ public class ConsoleUIInquirer implements Inquirer {
                 }
             }
             if (shouldAsk) {
-                boolean askAgain;
-                do {
-                    try {
-                        Object answer = askQuestion(consolePrompt, question);
-                        if (answer != null) {
-                            answers.put(question.getName(), answer);
-                        }
-                        askAgain = false;
-                    } catch (AnswerValidationException e) {
-                        System.out.println(Ansi.ansi().fgBright(Ansi.Color.RED).a("X " + e.getMessage()).reset().toString());
-                        askAgain = true;
-                    }
-
-                } while (askAgain);
+                Object answer = ask(question);
+                if (answer != null) {
+                    answers.put(question.getName(), answer);
+                }
             }
         }
         return answers;
+    }
+
+    @Override
+    public Object ask(Question question) throws InquirerException {
+        do {
+            try {
+                String message = question.getMessage();
+                String defaultValue = question.getDefaultValue();
+                Question.Type type = question.getType();
+                switch (question.getStyle()) {
+                    case CONFIRM:
+                        return prompter.promptConfirmation(message, defaultValue);
+                    case INPUT:
+                        return coerce(prompter.promptInput(message, defaultValue), type);
+                    case CHECKBOX:
+                        return coerce(prompter.promptCheckbox(message, question.getValues()), type);
+                    case LIST:
+                        return coerce(prompter.promptList(message, question.getValues()), type);
+                    case CHOICE:
+                        return coerce(prompter.promptChoice(message, question.getValues()), type);
+                    default:
+                        return null;
+                }
+            } catch (AnswerValidationException e) {
+                System.out.println(Ansi.ansi().fgBright(Ansi.Color.RED).a("X " + e.getMessage()).reset().toString());
+            } catch (PromptException e) {
+                throw new InquirerException("Unable to ask question", e);
+            }
+
+        } while (true);
     }
 
     private boolean isSatisfied(Condition condition, Map<String, Object> answers) {
@@ -123,51 +112,6 @@ public class ConsoleUIInquirer implements Inquirer {
                 return !answers.containsKey(ref);
             default:
                 return false;
-        }
-    }
-
-    private Object askQuestion(ConsolePrompt consolePrompt, Question question) throws InquirerException {
-        PromptBuilder promptBuilder = consolePrompt.getPromptBuilder();
-        String message = question.getMessage();
-        String name = question.getName();
-        String defaultValue = question.getDefaultValue();
-        switch (question.getStyle()) {
-            case CONFIRM:
-                addConfirmation(promptBuilder, name, message, defaultValue);
-                break;
-            case INPUT:
-                addInput(promptBuilder, name, message, defaultValue);
-                break;
-            case CHECKBOX:
-                addCheckbox(promptBuilder, name, message, question.getValues());
-                break;
-            case LIST:
-                addList(promptBuilder, name, message, question.getValues());
-                break;
-            case CHOICE:
-                addChoice(promptBuilder, name, message, question.getValues());
-                break;
-        }
-
-        PromtResultItemIF result;
-        try {
-            result = consolePrompt.prompt(promptBuilder.build()).values().iterator().next();
-        } catch (IOException e) {
-            throw new InquirerException("Unable to prompt question", e);
-        }
-
-        if (result instanceof ConfirmResult) {
-            return ((ConfirmResult) result).getConfirmed() == ConfirmChoice.ConfirmationValue.YES;
-        } else if (result instanceof ExpandableChoiceResult) {
-            return coerce(((ExpandableChoiceResult) result).getSelectedId(), question.getType());
-        } else if (result instanceof CheckboxResult) {
-            return coerce(((CheckboxResult) result).getSelectedIds(), question.getType());
-        } else if (result instanceof InputResult) {
-            return coerce(((InputResult) result).getInput(), question.getType());
-        } else if (result instanceof ListResult) {
-            return coerce(((ListResult) result).getSelectedId(), question.getType());
-        } else {
-            return null;
         }
     }
 
@@ -200,65 +144,5 @@ public class ConsoleUIInquirer implements Inquirer {
             default:
                 return value;
         }
-    }
-
-    private void addChoice(PromptBuilder promptBuilder, String name, String message, List<Value> values) {
-        ExpandableChoicePromptBuilder choicePromptBuilder = promptBuilder.createChoicePrompt()
-                .name(name)
-                .message(message);
-        for (Value value : values) {
-            choicePromptBuilder.newItem()
-                    .name(value.getName())
-                    .message(value.getLabel())
-                    .key(value.getKey())
-                    .add();
-        }
-        choicePromptBuilder.addPrompt();
-    }
-
-    private void addList(PromptBuilder promptBuilder, String name, String message, List<Value> values) {
-        ListPromptBuilder listPromptBuilder = promptBuilder.createListPrompt()
-                .name(name)
-                .message(message);
-        for (Value value : values) {
-            listPromptBuilder.newItem()
-                    .name(value.getName())
-                    .text(value.getLabel())
-                    .add();
-        }
-        listPromptBuilder.addPrompt();
-    }
-
-    private void addCheckbox(PromptBuilder promptBuilder, String name, String message, List<Value> values) {
-        CheckboxPromptBuilder checkboxPromptBuilder = promptBuilder.createCheckboxPrompt()
-                .name(name)
-                .message(message);
-        for (Value value : values) {
-            checkboxPromptBuilder.newItem()
-                    .name(value.getName())
-                    .text(value.getLabel())
-                    .add();
-        }
-        checkboxPromptBuilder.addPrompt();
-    }
-
-    private void addInput(PromptBuilder promptBuilder, String name, String message, String defaultValue) {
-        InputValueBuilder inputValueBuilder = promptBuilder.createInputPrompt()
-                .name(name)
-                .message(message);
-        if (defaultValue != null) {
-            inputValueBuilder.defaultValue(defaultValue);
-        }
-        inputValueBuilder.addPrompt();
-    }
-
-    private void addConfirmation(PromptBuilder promptBuilder, String name, String message, String defaultValue) {
-        ConfirmPromptBuilder confirmPromptBuilder = promptBuilder.createConfirmPromp()
-                .name(name)
-                .message(message);
-        if (defaultValue != null) {
-            confirmPromptBuilder.defaultValue(ConfirmChoice.ConfirmationValue.valueOf(defaultValue.toUpperCase(Locale.ENGLISH)));
-        }
-        confirmPromptBuilder.addPrompt();
     }
 }
