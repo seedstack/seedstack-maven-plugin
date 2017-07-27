@@ -161,10 +161,16 @@ public class GenerateMojo extends AbstractMojo {
         String artifactId = mavenSession.getUserProperties().getProperty("artifactId");
         try {
             if (StringUtils.isBlank(groupId)) {
-                groupId = prompter.promptInput("Generated project group id", null);
+                groupId = prompter.promptInput("Generated project group id", "org.generated.project");
+            }
+            if (StringUtils.isBlank(groupId)) {
+                throw new MojoExecutionException("Generated project group id cannot be blank");
             }
             if (StringUtils.isBlank(artifactId)) {
-                artifactId = prompter.promptInput("Generated project artifact id", null);
+                artifactId = prompter.promptInput("Generated project artifact id", "my-" + (StringUtils.isBlank(type) ? "" : type + "-") + "project");
+            }
+            if (StringUtils.isBlank(artifactId)) {
+                throw new MojoExecutionException("Generated project artifact id cannot be blank");
             }
         } catch (PromptException e) {
             throw new MojoExecutionException("Generated project group id and artifact id are required", e);
