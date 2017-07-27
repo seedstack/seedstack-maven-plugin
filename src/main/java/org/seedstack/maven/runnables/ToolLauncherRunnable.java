@@ -53,7 +53,12 @@ public class ToolLauncherRunnable implements Runnable {
 
     private Object getToolLauncher() throws MojoExecutionException {
         try {
-            Method getLauncherMethod = Thread.currentThread().getContextClassLoader().loadClass(SeedStackConstants.mainClassName).getMethod("getToolLauncher", String.class);
+            Method getLauncherMethod;
+            try {
+                getLauncherMethod = Thread.currentThread().getContextClassLoader().loadClass(SeedStackConstants.seedClassName).getMethod("getToolLauncher", String.class);
+            } catch (NoSuchMethodException e) {
+                getLauncherMethod = Thread.currentThread().getContextClassLoader().loadClass(SeedStackConstants.mainClassName).getMethod("getToolLauncher", String.class);
+            }
             return getLauncherMethod.invoke(null, tool);
         } catch (Exception e) {
             throw new MojoExecutionException("Cannot launch SeedStack tool", e);

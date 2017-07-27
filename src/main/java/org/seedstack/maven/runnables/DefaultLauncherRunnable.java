@@ -56,7 +56,12 @@ public class DefaultLauncherRunnable implements Runnable {
 
     private Object getSeedLauncher() throws Exception {
         try {
-            Method getLauncherMethod = Thread.currentThread().getContextClassLoader().loadClass(SeedStackConstants.mainClassName).getMethod("getLauncher");
+            Method getLauncherMethod;
+            try {
+                getLauncherMethod = Thread.currentThread().getContextClassLoader().loadClass(SeedStackConstants.seedClassName).getMethod("getLauncher");
+            } catch (NoSuchMethodException e) {
+                getLauncherMethod = Thread.currentThread().getContextClassLoader().loadClass(SeedStackConstants.mainClassName).getMethod("getLauncher");
+            }
             return getLauncherMethod.invoke(null);
         } catch (Exception e) {
             throw new MojoExecutionException("Cannot launch SeedStack application", e);

@@ -11,5 +11,6 @@ package org.seedstack.maven;
  * SeedStack useful constants.
  */
 public class SeedStackConstants {
+    public static final String seedClassName = "org.seedstack.seed.core.Seed";
     public static final String mainClassName = "org.seedstack.seed.core.SeedMain";
 }
