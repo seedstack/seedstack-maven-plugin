@@ -30,7 +30,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.artifactId;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.configuration;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.executeMojo;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.executionEnvironment;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.goal;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.groupId;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.plugin;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
 
 /**
  * Release the project simply by stripping the -SNAPSHOT part of the version.
@@ -238,6 +245,7 @@ public class ReleaseMojo extends AbstractMojo {
 
     private MavenProject buildProject(File moduleProjectFile) throws ProjectBuildingException {
         DefaultProjectBuildingRequest request = new DefaultProjectBuildingRequest();
+        request.setSystemProperties(System.getProperties());
         request.setRepositorySession(executionMavenProject.getProjectBuildingRequest().getRepositorySession());
         return projectBuilder.build(moduleProjectFile, request).getProject();
     }

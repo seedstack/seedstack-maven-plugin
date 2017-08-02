@@ -1,4 +1,4 @@
-# Version 2.5.0 (2017-07-30)
+# Version 2.5.0 (2017-08-02)
 
 * [new] Colorized, interactive prompter thanks to [ConsoleUI](https://github.com/awegmann/consoleui).
 * [new] Supports [Pebble](http://www.mitchellbosecke.com/pebble/home) template language in archetypes.
