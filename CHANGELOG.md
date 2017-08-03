@@ -1,3 +1,8 @@
+# Version 2.6.0 (2017-08-03)
+
+* [new] Add the ability to template project file names in project archetypes.
+* [new] Add the ability to generate class configuration in templates with `yamlClassConfig` function. 
+
 # Version 2.5.0 (2017-08-02)
 
 * [new] Colorized, interactive prompter thanks to [ConsoleUI](https://github.com/awegmann/consoleui).

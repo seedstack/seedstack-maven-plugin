@@ -7,8 +7,11 @@
  */
 package org.seedstack.maven;
 
+import com.google.common.base.CaseFormat;
 import com.mitchellbosecke.pebble.PebbleEngine;
 import com.mitchellbosecke.pebble.error.PebbleException;
+import com.mitchellbosecke.pebble.loader.FileLoader;
+import com.mitchellbosecke.pebble.loader.StringLoader;
 import com.mitchellbosecke.pebble.template.PebbleTemplate;
 import org.apache.commons.lang.StringUtils;
 import org.apache.maven.archetype.ArchetypeManager;
@@ -29,6 +32,7 @@ import org.seedstack.maven.components.prompter.PromptException;
 import org.seedstack.maven.components.prompter.Prompter;
 import org.seedstack.maven.components.prompter.Value;
 import org.seedstack.maven.components.resolver.ArtifactResolver;
+import org.seedstack.maven.components.templating.SeedStackExtension;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -43,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -66,24 +71,20 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
 public class GenerateMojo extends AbstractMojo {
     private static final String ARCHETYPE_PLUGIN_GROUP_ID = "org.apache.maven.plugins";
     private static final String ARCHETYPE_PLUGIN_ARTIFACT_ID = "maven-archetype-plugin";
+    private PebbleEngine stringTemplateEngine;
+    private PebbleEngine fileTemplateEngine;
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject mavenProject;
-
     @Parameter(defaultValue = "${session}", required = true, readonly = true)
     private MavenSession mavenSession;
-
     @Component
     private BuildPluginManager buildPluginManager;
-
     @Component
     private ArtifactResolver artifactResolver;
-
     @Component
     private ArchetypeManager archetypeManager;
-
     @Component
     private Prompter prompter;
-
     @Component
     private Inquirer inquire;
 
@@ -193,7 +194,7 @@ public class GenerateMojo extends AbstractMojo {
                 goal("generate"),
 
                 configuration(
-                        element(name("interactiveMode"), "true"),
+                        element(name("interactiveMode"), "false"),
                         element(name("archetypeGroupId"), archetypeGroupId),
                         element(name("archetypeArtifactId"), archetypeArtifactId),
                         element(name("archetypeVersion"), archetypeVersion)
@@ -203,15 +204,29 @@ public class GenerateMojo extends AbstractMojo {
 
         File projectDir = new File("." + File.separator + artifactId);
         if (projectDir.exists() && projectDir.canWrite()) {
-            PebbleEngine engine = new PebbleEngine.Builder().build();
+            // Create template engines
+            stringTemplateEngine = new PebbleEngine.Builder()
+                    .loader(new StringLoader())
+                    .build();
+            fileTemplateEngine = new PebbleEngine.Builder()
+                    .loader(new FileLoader())
+                    .extension(new SeedStackExtension(groupId))
+                    .build();
+
+            // Create vars
             HashMap<String, Object> vars = new HashMap<>();
 
             // Put project values in vars
             HashMap<String, Object> projectVars = new HashMap<>();
+            String normalizedLowerName = CaseFormat.LOWER_HYPHEN.to(CaseFormat.LOWER_CAMEL, artifactId);
+            String normalizedUpperName = CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, normalizedLowerName);
             projectVars.put("type", type);
             projectVars.put("groupId", groupId);
             projectVars.put("artifactId", artifactId);
             projectVars.put("version", version);
+            projectVars.put("package", groupId);
+            projectVars.put("lowerName", normalizedLowerName);
+            projectVars.put("upperName", normalizedUpperName);
             vars.put("project", projectVars);
 
             // Put archetype values in vars
@@ -234,11 +249,11 @@ public class GenerateMojo extends AbstractMojo {
                 getLog().error("Unable to process question file, resulting project might be unusable", e);
             }
 
-            renderTemplates(projectDir, engine, vars);
+            renderTemplates(projectDir, vars);
         }
     }
 
-    private void renderTemplates(File file, PebbleEngine engine, Map<String, Object> vars) {
+    private void renderTemplates(File file, Map<String, Object> vars) {
         if (!file.exists()) {
             return;
         }
@@ -247,22 +262,24 @@ public class GenerateMojo extends AbstractMojo {
             File[] files = file.listFiles();
             if (files != null) {
                 for (File c : files) {
-                    renderTemplates(c, engine, vars);
+                    renderTemplates(c, vars);
                 }
             }
         }
 
         if (file.isFile() && file.canWrite()) {
-            getLog().info("Rendering template " + file.getPath());
             try {
-                String absolutePath = file.getCanonicalFile().getAbsolutePath();
-                PebbleTemplate template = engine.getTemplate(absolutePath);
+                String originalPath = file.getCanonicalFile().getAbsolutePath();
+                String outputPath = processPath(originalPath, vars);
+                PebbleTemplate template = fileTemplateEngine.getTemplate(originalPath);
                 StringWriter stringWriter = new StringWriter();
+
+                getLog().info("Rendering template " + outputPath);
 
                 template.evaluate(stringWriter, vars);
                 String renderedContent = stringWriter.toString();
                 if (renderedContent.trim().length() > 0) {
-                    try (Writer writer = new OutputStreamWriter(new FileOutputStream(absolutePath), StandardCharsets.UTF_8)) {
+                    try (Writer writer = new OutputStreamWriter(new FileOutputStream(outputPath), StandardCharsets.UTF_8)) {
                         writer.write(renderedContent);
                     }
                 } else {
@@ -271,9 +288,26 @@ public class GenerateMojo extends AbstractMojo {
                         getLog().warn("Unable to delete template, useless files may be still be present in project");
                     }
                 }
+                if (!originalPath.equals(outputPath)) {
+                    if (!new File(originalPath).delete()) {
+                        getLog().warn("Unable to delete original file, useless files may be still be present in project");
+                    }
+                }
             } catch (PebbleException | IOException e) {
                 getLog().error("Unable to render template, resulting project might be unusable", e);
             }
+        }
+    }
+
+    private String processPath(String absolutePath, Map<String, Object> vars) {
+        try {
+            StringWriter stringWriter = new StringWriter();
+            PebbleTemplate template = stringTemplateEngine.getTemplate(absolutePath);
+            template.evaluate(stringWriter, vars);
+            return stringWriter.toString();
+        } catch (PebbleException | IOException e) {
+            getLog().error("Unable to render filename template, resulting project might be unusable", e);
+            return absolutePath;
         }
     }
 
