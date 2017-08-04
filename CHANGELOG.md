@@ -1,6 +1,6 @@
 # Version 2.6.1 (2017-08-04)
 
-* [new] Fallback to seedstack.org archetype catalog if nothing is found on the default remote or locally.
+* [chg] Search custom archetype catalog first (`http://seedstack.org/maven/` by default), then central, then local, then manual coordinates.
 
 # Version 2.6.0 (2017-08-03)
 

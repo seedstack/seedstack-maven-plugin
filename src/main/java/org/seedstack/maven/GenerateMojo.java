@@ -96,7 +96,8 @@ public class GenerateMojo extends AbstractMojo {
                 version = mavenSession.getUserProperties().getProperty("version"),
                 archetypeGroupId = mavenSession.getUserProperties().getProperty("archetypeGroupId"),
                 archetypeArtifactId = mavenSession.getUserProperties().getProperty("archetypeArtifactId"),
-                archetypeVersion = mavenSession.getUserProperties().getProperty("archetypeVersion");
+                archetypeVersion = mavenSession.getUserProperties().getProperty("archetypeVersion"),
+                remoteCatalog = mavenSession.getUserProperties().getProperty("remoteCatalog", SEEDSTACK_ORG);
         boolean allowSnapshots = !mavenSession.getUserProperties().getProperty("allowSnapshots", "false").equals("false");
 
 
@@ -112,7 +113,7 @@ public class GenerateMojo extends AbstractMojo {
                     archetypeVersion = artifactResolver.getHighestVersion(mavenProject, distributionGroupId, distributionArtifactId, allowSnapshots);
                     getLog().info("Resolved version " + archetypeVersion);
                 }
-                Set<String> possibleTypes = findProjectTypes(archetypeGroupId, archetypeVersion);
+                Set<String> possibleTypes = findProjectTypes(archetypeGroupId, archetypeVersion, remoteCatalog);
                 try {
                     // We have a list of possible types, let the user choose
                     if (!possibleTypes.isEmpty()) {
@@ -120,7 +121,10 @@ public class GenerateMojo extends AbstractMojo {
                         Collections.sort(list);
                         list.add("custom archetype");
                         type = prompter.promptList("Choose the project type", Value.convertList(list));
+                    } else {
+                        getLog().info("No " + archetypeVersion + " archetype found, enter coordinates manually");
                     }
+
                     // No possible types or the user wants to input a custom archetype
                     if (possibleTypes.isEmpty() || "custom archetype".equals(type)) {
                         // Ask for archetype group id (defaults to distribution group id)
@@ -311,21 +315,18 @@ public class GenerateMojo extends AbstractMojo {
         }
     }
 
-    private Set<String> findProjectTypes(String archetypeGroupId, String archetypeVersion) {
+    private Set<String> findProjectTypes(String archetypeGroupId, String archetypeVersion, String remoteCatalog) {
         Set<String> possibleTypes = new HashSet<>();
-        getLog().info("Searching for archetypes in remote catalog");
-        possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getRemoteCatalog()));
+        getLog().info("Searching for " + archetypeVersion + " archetypes in remote catalog " + remoteCatalog);
+        possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getRemoteCatalog(remoteCatalog)));
 
         if (possibleTypes.isEmpty()) {
-            getLog().info("No remote archetype found with version " + archetypeVersion + ", trying the local catalog");
+            getLog().info("No remote " + archetypeVersion + " archetype found, trying the central catalog");
+            possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getRemoteCatalog()));
+        }
+        if (possibleTypes.isEmpty()) {
+            getLog().info("No remote or central " + archetypeVersion + " archetype found, trying the local catalog");
             possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getDefaultLocalCatalog()));
-        }
-        if (possibleTypes.isEmpty()) {
-            getLog().info("No local archetype found with version " + archetypeVersion + ", falling back to seedstack.org");
-            possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getRemoteCatalog(SEEDSTACK_ORG)));
-        }
-        if (possibleTypes.isEmpty()) {
-            getLog().info("No suitable archetype found");
         }
 
         return possibleTypes;
