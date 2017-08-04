@@ -47,7 +47,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -71,6 +70,7 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
 public class GenerateMojo extends AbstractMojo {
     private static final String ARCHETYPE_PLUGIN_GROUP_ID = "org.apache.maven.plugins";
     private static final String ARCHETYPE_PLUGIN_ARTIFACT_ID = "maven-archetype-plugin";
+    private static final String SEEDSTACK_ORG = "http://seedstack.org/maven/";
     private PebbleEngine stringTemplateEngine;
     private PebbleEngine fileTemplateEngine;
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
@@ -319,6 +319,10 @@ public class GenerateMojo extends AbstractMojo {
         if (possibleTypes.isEmpty()) {
             getLog().info("No remote archetype found with version " + archetypeVersion + ", trying the local catalog");
             possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getDefaultLocalCatalog()));
+        }
+        if (possibleTypes.isEmpty()) {
+            getLog().info("No local archetype found with version " + archetypeVersion + ", falling back to seedstack.org");
+            possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getRemoteCatalog(SEEDSTACK_ORG)));
         }
         if (possibleTypes.isEmpty()) {
             getLog().info("No suitable archetype found");

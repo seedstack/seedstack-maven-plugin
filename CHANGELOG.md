@@ -1,3 +1,7 @@
+# Version 2.6.1 (2017-08-04)
+
+* [new] Fallback to seedstack.org archetype catalog if nothing is found on the default remote or locally.
+
 # Version 2.6.0 (2017-08-03)
 
 * [new] Add the ability to template project file names in project archetypes.
