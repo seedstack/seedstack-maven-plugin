@@ -113,24 +113,21 @@ public class GenerateMojo extends AbstractMojo {
                     archetypeVersion = artifactResolver.getHighestVersion(mavenProject, distributionGroupId, distributionArtifactId, allowSnapshots);
                     getLog().info("Resolved version " + archetypeVersion);
                 }
-                Set<String> possibleTypes = findProjectTypes(archetypeGroupId, archetypeVersion, remoteCatalog);
                 try {
                     // We have a list of possible types, let the user choose
-                    if (!possibleTypes.isEmpty()) {
-                        ArrayList<String> list = new ArrayList<>(possibleTypes);
-                        Collections.sort(list);
-                        list.add("custom archetype");
-                        type = prompter.promptList("Choose the project type", Value.convertList(list));
-                    } else {
-                        getLog().info("No " + archetypeVersion + " archetype found, enter coordinates manually");
-                    }
+                    ArrayList<String> list = new ArrayList<>(findProjectTypes(archetypeGroupId, archetypeVersion, remoteCatalog));
+                    Collections.sort(list);
+                    list.add("custom archetype");
+                    type = prompter.promptList("Choose the project type", Value.convertList(list));
 
-                    // No possible types or the user wants to input a custom archetype
-                    if (possibleTypes.isEmpty() || "custom archetype".equals(type)) {
+                    // If the user wants to input a custom archetype
+                    if ("custom archetype".equals(type)) {
                         // Ask for archetype group id (defaults to distribution group id)
                         archetypeGroupId = prompter.promptInput("Enter the archetype group id", archetypeGroupId);
                         // Ask for archetype artifact id
-                        archetypeArtifactId = prompter.promptInput("Enter the archetype artifact id", "web-archetype");
+                        while (archetypeArtifactId == null || archetypeArtifactId.isEmpty()) {
+                            archetypeArtifactId = prompter.promptInput("Enter the archetype artifact id", null);
+                        }
                         // Ask for archetype version (defaults to latest)
                         try {
                             archetypeVersion = artifactResolver.getHighestVersion(mavenProject, archetypeGroupId, archetypeArtifactId, allowSnapshots);
@@ -345,6 +342,14 @@ public class GenerateMojo extends AbstractMojo {
         if (possibleTypes.isEmpty()) {
             getLog().info("No remote or central " + archetypeVersion + " archetype found, trying the local catalog");
             possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getDefaultLocalCatalog()));
+        }
+        if (possibleTypes.isEmpty()) {
+            getLog().warn("No " + archetypeVersion + " archetype found anywhere (check your Maven proxy settings), falling back to hard-coded list");
+            possibleTypes.add("addon");
+            possibleTypes.add("batch");
+            possibleTypes.add("cli");
+            possibleTypes.add("domain");
+            possibleTypes.add("web");
         }
 
         return possibleTypes;

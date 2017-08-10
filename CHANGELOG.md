@@ -1,7 +1,8 @@
 # Version 2.6.2 (2017-08-10)
 
-* [chg] Use `web-archetype` as default archetype id when manually entering coordinates during generation.
-* [chg] If the user cancels (ctrl+c) generation during questions, still render the template with fallback variables. 
+* [chg] Add a fallback to hard-coded archetype list for project generation.
+* [chg] In the case of project generation with a custom archetype, ensures that archetype id is not blank.
+* [chg] If the user cancels (ctrl+c) project generation during questions, still render the template with fallback values. 
 
 # Version 2.6.1 (2017-08-04)
 
