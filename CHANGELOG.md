@@ -1,3 +1,8 @@
+# Version 2.6.2 (2017-08-10)
+
+* [chg] Use `web-archetype` as default archetype id when manually entering coordinates during generation.
+* [chg] If the user cancels (ctrl+c) generation during questions, still render the template with fallback variables. 
+
 # Version 2.6.1 (2017-08-04)
 
 * [chg] Search custom archetype catalog first (`http://seedstack.org/maven/` by default), then central, then local, then manual coordinates.

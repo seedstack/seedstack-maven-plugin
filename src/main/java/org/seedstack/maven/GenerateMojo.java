@@ -130,7 +130,7 @@ public class GenerateMojo extends AbstractMojo {
                         // Ask for archetype group id (defaults to distribution group id)
                         archetypeGroupId = prompter.promptInput("Enter the archetype group id", archetypeGroupId);
                         // Ask for archetype artifact id
-                        archetypeArtifactId = prompter.promptInput("Enter the archetype artifact id", null);
+                        archetypeArtifactId = prompter.promptInput("Enter the archetype artifact id", "web-archetype");
                         // Ask for archetype version (defaults to latest)
                         try {
                             archetypeVersion = artifactResolver.getHighestVersion(mavenProject, archetypeGroupId, archetypeArtifactId, allowSnapshots);
@@ -206,8 +206,10 @@ public class GenerateMojo extends AbstractMojo {
 
                 executionEnvironment(mavenProject, mavenSession, buildPluginManager));
 
-        File projectDir = new File("." + File.separator + artifactId);
+        final File projectDir = new File("." + File.separator + artifactId);
         if (projectDir.exists() && projectDir.canWrite()) {
+            final File questionFile = new File(projectDir, "questions.json");
+
             // Create template engines
             stringTemplateEngine = new PebbleEngine.Builder()
                     .loader(new StringLoader())
@@ -218,7 +220,7 @@ public class GenerateMojo extends AbstractMojo {
                     .build();
 
             // Create vars
-            HashMap<String, Object> vars = new HashMap<>();
+            final HashMap<String, Object> vars = new HashMap<>();
 
             // Put project values in vars
             HashMap<String, Object> projectVars = new HashMap<>();
@@ -240,11 +242,24 @@ public class GenerateMojo extends AbstractMojo {
             archetypeVars.put("version", archetypeVersion);
             vars.put("archetype", archetypeVars);
 
+            Thread shutdownRender = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    renderTemplates(projectDir, vars);
+                    if (questionFile.exists() && questionFile.canRead() && !questionFile.delete()) {
+                        getLog().warn("Unable to delete question file, useless files may be still be present in project");
+                    }
+                }
+            }, "render-hook");
+
+            // If the user cancels during question, complete the process with minimal vars
+            Runtime.getRuntime().addShutdownHook(shutdownRender);
+
             // Inquire from user if a question file is present
+            HashMap<String, Object> varsWithAnswers = new HashMap<>(vars);
             try {
-                File questionFile = new File(projectDir, "questions.json");
                 if (questionFile.exists() && questionFile.canRead()) {
-                    vars.putAll(inquire.inquire(questionFile.toURI().toURL()));
+                    varsWithAnswers.putAll(inquire.inquire(questionFile.toURI().toURL()));
                     if (!questionFile.delete()) {
                         getLog().warn("Unable to delete question file, useless files may be still be present in project");
                     }
@@ -253,7 +268,10 @@ public class GenerateMojo extends AbstractMojo {
                 getLog().error("Unable to process question file, resulting project might be unusable", e);
             }
 
-            renderTemplates(projectDir, vars);
+            // We can now do the rendering properly, cancel the shutdown hook
+            Runtime.getRuntime().removeShutdownHook(shutdownRender);
+
+            renderTemplates(projectDir, varsWithAnswers);
         }
     }
 
