@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 package org.seedstack.maven;
 
 import static org.twdata.maven.mojoexecutor.MojoExecutor.artifactId;
@@ -94,21 +95,29 @@ public class GenerateMojo extends AbstractSeedStackMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        this.basicMode = !mavenSession.getUserProperties().getProperty("basicPrompt", "false").equals("false");
+        if (mavenSession.getUserProperties().getProperty("basicPrompt") == null) {
+            this.basicMode = autodetectBasicMode();
+        } else {
+            this.basicMode = !mavenSession.getUserProperties().getProperty("basicPrompt", "false").equals("false");
+        }
         if (!basicMode) {
-            getLog().info("Hint: if enhanced prompt has issues on your system, try basic prompt by adding \"-DbasicPrompt\" to your command line");
+            getLog().info(
+                    "Hint: if enhanced prompt has issues on your system, try basic prompt by adding \"-DbasicPrompt\""
+                            + " to your command line");
         }
 
         String type = mavenSession.getUserProperties().getProperty("type"),
-                distributionGroupId = mavenSession.getUserProperties().getProperty("distributionGroupId", "org.seedstack"),
-                distributionArtifactId = mavenSession.getUserProperties().getProperty("distributionArtifactId", "distribution"),
+                distributionGroupId = mavenSession.getUserProperties()
+                        .getProperty("distributionGroupId", "org.seedstack"),
+                distributionArtifactId = mavenSession.getUserProperties()
+                        .getProperty("distributionArtifactId", "distribution"),
                 version = mavenSession.getUserProperties().getProperty("version"),
                 archetypeGroupId = mavenSession.getUserProperties().getProperty("archetypeGroupId"),
                 archetypeArtifactId = mavenSession.getUserProperties().getProperty("archetypeArtifactId"),
                 archetypeVersion = mavenSession.getUserProperties().getProperty("archetypeVersion"),
                 remoteCatalog = mavenSession.getUserProperties().getProperty("remoteCatalog", SEEDSTACK_ORG);
-        boolean allowSnapshots = !mavenSession.getUserProperties().getProperty("allowSnapshots", "false").equals("false");
-
+        boolean allowSnapshots = !mavenSession.getUserProperties().getProperty("allowSnapshots", "false")
+                .equals("false");
 
         if (StringUtils.isBlank(archetypeGroupId)) {
             archetypeGroupId = distributionGroupId;
@@ -118,13 +127,19 @@ public class GenerateMojo extends AbstractSeedStackMojo {
             if (StringUtils.isBlank(type)) {
                 // Resolve archetype version using SeedStack highest version
                 if (StringUtils.isBlank(archetypeVersion)) {
-                    getLog().info("Resolving latest " + (allowSnapshots ? "snapshot" : "release") + " of SeedStack (" + distributionGroupId + ")");
-                    archetypeVersion = artifactResolver.getHighestVersion(mavenProject, distributionGroupId, distributionArtifactId, allowSnapshots);
+                    getLog().info(
+                            "Resolving latest " + (allowSnapshots ? "snapshot" : "release") + " of SeedStack (" +
+                                    distributionGroupId + ")");
+                    archetypeVersion = artifactResolver
+                            .getHighestVersion(mavenProject, distributionGroupId, distributionArtifactId,
+                                    allowSnapshots);
                     getLog().info("Resolved version " + archetypeVersion);
                 }
                 try {
-                    // We have a list of possible types, let the user choose (if a "web" choice exists, set it as default)
-                    List<Value> list = new ArrayList<>(findProjectTypes(archetypeGroupId, archetypeVersion, remoteCatalog));
+                    // We have a list of possible types, let the user choose (if a "web" choice exists, set it as
+                    // default)
+                    List<Value> list = new ArrayList<>(
+                            findProjectTypes(archetypeGroupId, archetypeVersion, remoteCatalog));
                     Collections.sort(list);
                     list.add(new Value("custom archetype", "custom"));
                     type = getPrompter().promptList("Choose the project type", list, "web");
@@ -139,7 +154,9 @@ public class GenerateMojo extends AbstractSeedStackMojo {
                         }
                         // Ask for archetype version (defaults to latest)
                         try {
-                            archetypeVersion = artifactResolver.getHighestVersion(mavenProject, archetypeGroupId, archetypeArtifactId, allowSnapshots);
+                            archetypeVersion = artifactResolver
+                                    .getHighestVersion(mavenProject, archetypeGroupId, archetypeArtifactId,
+                                            allowSnapshots);
                         } catch (Exception e) {
                             archetypeVersion = null;
                         }
@@ -157,8 +174,11 @@ public class GenerateMojo extends AbstractSeedStackMojo {
 
         // If needed, find the latest version of the archetype
         if (StringUtils.isBlank(archetypeVersion)) {
-            getLog().info("Resolving latest " + (allowSnapshots ? "snapshot" : "release") + " of archetype " + archetypeGroupId + ":" + archetypeArtifactId);
-            archetypeVersion = artifactResolver.getHighestVersion(mavenProject, archetypeGroupId, archetypeArtifactId, allowSnapshots);
+            getLog().info(
+                    "Resolving latest " + (allowSnapshots ? "snapshot" : "release") + " of archetype " +
+                            archetypeGroupId + ":" + archetypeArtifactId);
+            archetypeVersion = artifactResolver
+                    .getHighestVersion(mavenProject, archetypeGroupId, archetypeArtifactId, allowSnapshots);
             getLog().info("Resolved version " + archetypeVersion);
         }
 
@@ -178,7 +198,8 @@ public class GenerateMojo extends AbstractSeedStackMojo {
                 throw new MojoExecutionException("Generated project group id cannot be blank");
             }
             if (StringUtils.isBlank(artifactId)) {
-                artifactId = getPrompter().promptInput("Generated project artifact id", "my-" + (StringUtils.isBlank(type) ? "" : type + "-") + "project");
+                artifactId = getPrompter().promptInput("Generated project artifact id",
+                        "my-" + (StringUtils.isBlank(type) ? "" : type + "-") + "project");
             }
             if (StringUtils.isBlank(artifactId)) {
                 throw new MojoExecutionException("Generated project artifact id cannot be blank");
@@ -192,14 +213,16 @@ public class GenerateMojo extends AbstractSeedStackMojo {
 
         String pluginVersion;
         try {
-            pluginVersion = artifactResolver.getHighestVersion(mavenProject, ARCHETYPE_PLUGIN_GROUP_ID, ARCHETYPE_PLUGIN_ARTIFACT_ID, false);
+            pluginVersion = artifactResolver
+                    .getHighestVersion(mavenProject, ARCHETYPE_PLUGIN_GROUP_ID, ARCHETYPE_PLUGIN_ARTIFACT_ID, false);
             getLog().info("Using the latest version of archetype plugin: " + pluginVersion);
         } catch (Exception e) {
             getLog().warn("Unable to determine latest version of archetype plugin, falling back to 3.0.0");
             pluginVersion = "3.0.0";
         }
 
-        executeMojo(plugin(groupId(ARCHETYPE_PLUGIN_GROUP_ID), artifactId(ARCHETYPE_PLUGIN_ARTIFACT_ID), version(pluginVersion)),
+        executeMojo(plugin(groupId(ARCHETYPE_PLUGIN_GROUP_ID), artifactId(ARCHETYPE_PLUGIN_ARTIFACT_ID),
+                version(pluginVersion)),
 
                 goal("generate"),
 
@@ -257,7 +280,8 @@ public class GenerateMojo extends AbstractSeedStackMojo {
                 if (questionFile.exists() && questionFile.canRead()) {
                     varsWithAnswers.putAll(getInquirer().inquire(questionFile.toURI().toURL()));
                     if (!questionFile.delete()) {
-                        getLog().warn("Unable to delete question file, useless files may be still be present in project");
+                        getLog().warn(
+                                "Unable to delete question file, useless files may be still be present in project");
                     }
                 }
             } catch (MalformedURLException | InquirerException e) {
@@ -271,7 +295,8 @@ public class GenerateMojo extends AbstractSeedStackMojo {
         }
     }
 
-    private Thread setupInquiryCancelHook(final File projectDir, final File questionFile, final HashMap<String, Object> vars) {
+    private Thread setupInquiryCancelHook(final File projectDir, final File questionFile,
+            final HashMap<String, Object> vars) {
         Thread shutdownRender = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -312,7 +337,8 @@ public class GenerateMojo extends AbstractSeedStackMojo {
                 template.evaluate(stringWriter, vars);
                 String renderedContent = stringWriter.toString();
                 if (renderedContent.trim().length() > 0) {
-                    try (Writer writer = new OutputStreamWriter(new FileOutputStream(outputPath), StandardCharsets.UTF_8)) {
+                    try (Writer writer = new OutputStreamWriter(new FileOutputStream(outputPath),
+                            StandardCharsets.UTF_8)) {
                         writer.write(renderedContent);
                     }
                 } else {
@@ -323,7 +349,8 @@ public class GenerateMojo extends AbstractSeedStackMojo {
                 }
                 if (!originalPath.equals(outputPath)) {
                     if (!new File(originalPath).delete()) {
-                        getLog().warn("Unable to delete original file, useless files may be still be present in project");
+                        getLog().warn(
+                                "Unable to delete original file, useless files may be still be present in project");
                     }
                 }
             } catch (PebbleException | IOException e) {
@@ -347,18 +374,23 @@ public class GenerateMojo extends AbstractSeedStackMojo {
     private Set<Value> findProjectTypes(String archetypeGroupId, String archetypeVersion, String remoteCatalog) {
         Set<Value> possibleTypes = new HashSet<>();
         getLog().info("Searching for " + archetypeVersion + " archetypes in remote catalog " + remoteCatalog);
-        possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getRemoteCatalog(remoteCatalog)));
+        possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion,
+                archetypeManager.getRemoteCatalog(remoteCatalog)));
 
         if (possibleTypes.isEmpty()) {
             getLog().info("No remote " + archetypeVersion + " archetype found, trying the central catalog");
-            possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getRemoteCatalog()));
+            possibleTypes
+                    .addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getRemoteCatalog()));
         }
         if (possibleTypes.isEmpty()) {
             getLog().info("No remote or central " + archetypeVersion + " archetype found, trying the local catalog");
-            possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getDefaultLocalCatalog()));
+            possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion,
+                    archetypeManager.getDefaultLocalCatalog()));
         }
         if (possibleTypes.isEmpty()) {
-            getLog().warn("No " + archetypeVersion + " archetype found anywhere (check your Maven proxy settings), falling back to hard-coded list");
+            getLog().warn(
+                    "No " + archetypeVersion + " archetype found anywhere (check your Maven proxy settings), falling "
+                            + "back to hard-coded list");
             possibleTypes.add(new Value("addon"));
             possibleTypes.add(new Value("batch"));
             possibleTypes.add(new Value("cli"));
@@ -396,5 +428,16 @@ public class GenerateMojo extends AbstractSeedStackMojo {
         } else {
             return fancyInquirer;
         }
+    }
+
+    private boolean autodetectBasicMode() {
+        String ostype = System.getenv("OSTYPE");
+        if (ostype != null && !ostype.isEmpty()) {
+            // Fancy mode never works under cygwin
+            if (ostype.startsWith("cygwin")) {
+                return true;
+            }
+        }
+        return false;
     }
 }
