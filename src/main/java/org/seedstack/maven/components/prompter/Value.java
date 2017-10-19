@@ -97,11 +97,23 @@ public class Value implements Comparable<Value> {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Value value = (Value) o;
+
+        return name.equals(value.name);
+    }
+
+    @Override
+    public int hashCode() {
+        return name.hashCode();
+    }
+
+    @Override
     public int compareTo(Value o) {
-        if (o == null) {
-            throw new NullPointerException("Attempt to compare to null value");
-        }
-        return this.label.compareTo(o.label);
+        return this.name.compareTo(o.name);
     }
 }
 

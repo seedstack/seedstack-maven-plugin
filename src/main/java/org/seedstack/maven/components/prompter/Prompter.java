@@ -14,7 +14,7 @@ import java.util.Set;
 public interface Prompter {
     String promptChoice(String message, List<Value> values) throws PromptException;
 
-    String promptList(String message, List<Value> values) throws PromptException;
+    String promptList(String message, List<Value> values, String defaultValue) throws PromptException;
 
     Set<String> promptCheckbox(String message, List<Value> values) throws PromptException;
 

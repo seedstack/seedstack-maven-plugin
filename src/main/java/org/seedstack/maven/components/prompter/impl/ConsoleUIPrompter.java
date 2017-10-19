@@ -57,18 +57,38 @@ public class ConsoleUIPrompter implements Prompter {
     }
 
     @Override
-    public String promptList(String message, List<Value> values) throws PromptException {
+    public String promptList(String message, List<Value> values, String defaultValue) throws PromptException {
         ConsolePrompt consolePrompt = new ConsolePrompt();
         PromptBuilder promptBuilder = consolePrompt.getPromptBuilder();
         ListPromptBuilder listPromptBuilder = promptBuilder.createListPrompt()
                 .name("dummy")
                 .message(message);
-        for (Value value : values) {
-            listPromptBuilder.newItem()
-                    .name(value.getName())
-                    .text(value.getLabel())
-                    .add();
+
+        // Put default value first
+        Value defaultValueObject = null;
+        if (defaultValue != null && !defaultValue.isEmpty()) {
+            for (Value value : values) {
+                if (value.getName().equals(defaultValue)) {
+                    defaultValueObject = value;
+                    listPromptBuilder.newItem()
+                            .name(value.getName())
+                            .text(value.getLabel())
+                            .add();
+                    break;
+                }
+            }
         }
+
+        // Put other values
+        for (Value value : values) {
+            if (!value.equals(defaultValueObject)) {
+                listPromptBuilder.newItem()
+                        .name(value.getName())
+                        .text(value.getLabel())
+                        .add();
+            }
+        }
+
         listPromptBuilder.addPrompt();
         return ((ListResult) extractAnswer(consolePrompt, promptBuilder)).getSelectedId();
     }

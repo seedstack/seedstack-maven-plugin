@@ -85,7 +85,7 @@ public abstract class AbstractInquirer implements Inquirer {
                     case CHECKBOX:
                         return coerce(getPrompter().promptCheckbox(message, question.getValues()), type);
                     case LIST:
-                        return coerce(getPrompter().promptList(message, question.getValues()), type);
+                        return coerce(getPrompter().promptList(message, question.getValues(), defaultValue), type);
                     case CHOICE:
                         return coerce(getPrompter().promptChoice(message, question.getValues()), type);
                     default:

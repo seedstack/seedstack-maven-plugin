@@ -123,11 +123,11 @@ public class GenerateMojo extends AbstractSeedStackMojo {
                     getLog().info("Resolved version " + archetypeVersion);
                 }
                 try {
-                    // We have a list of possible types, let the user choose
+                    // We have a list of possible types, let the user choose (if a "web" choice exists, set it as default)
                     List<Value> list = new ArrayList<>(findProjectTypes(archetypeGroupId, archetypeVersion, remoteCatalog));
                     Collections.sort(list);
                     list.add(new Value("custom archetype", "custom"));
-                    type = getPrompter().promptList("Choose the project type", list);
+                    type = getPrompter().promptList("Choose the project type", list, "web");
 
                     // If the user wants to input a custom archetype
                     if ("custom".equals(type)) {
@@ -270,21 +270,6 @@ public class GenerateMojo extends AbstractSeedStackMojo {
             renderTemplates(projectDir, varsWithAnswers);
         }
     }
-
-    private Thread setupBasicPromptHintHook() {
-        Thread basicPromptHook = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                if (!basicMode) {
-                    getLog().info("Hint: if you experience prompting issues, try the basic prompt instead by adding \"-DbasicPrompt\" to your command line");
-                }
-            }
-        }, "basic-prompt-hook");
-        Runtime.getRuntime().addShutdownHook(basicPromptHook);
-        return basicPromptHook;
-    }
-
-
 
     private Thread setupInquiryCancelHook(final File projectDir, final File questionFile, final HashMap<String, Object> vars) {
         Thread shutdownRender = new Thread(new Runnable() {

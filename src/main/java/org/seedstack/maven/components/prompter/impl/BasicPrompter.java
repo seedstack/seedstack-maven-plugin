@@ -33,19 +33,14 @@ public class BasicPrompter implements Prompter {
         throw new UnsupportedOperationException("Basic prompter cannot handle complex choices");
     }
 
-    @Override
-    public String promptList(String message, List<Value> values) throws PromptException {
-        return promptList(message, values, null);
-    }
-
-    private String promptList(String message, List<Value> values, String defaultValue) throws PromptException {
+    public String promptList(String message, List<Value> values, String defaultValue) throws PromptException {
         List<String> strings = Value.convertValues(values);
-        String formattedMessage = formatMessage(message, strings, null);
+        String formattedMessage = formatMessage(message, strings, defaultValue);
         String line;
         do {
             writePrompt(formattedMessage);
             line = readLine();
-            if (line == null && defaultValue != null) {
+            if ((line == null || line.isEmpty()) && defaultValue != null) {
                 line = defaultValue;
             }
         } while (line == null || !strings.contains(line));
