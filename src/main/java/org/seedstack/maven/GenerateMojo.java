@@ -7,18 +7,44 @@
  */
 package org.seedstack.maven;
 
+import static org.twdata.maven.mojoexecutor.MojoExecutor.artifactId;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.configuration;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.element;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.executeMojo;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.executionEnvironment;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.goal;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.groupId;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.name;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.plugin;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
+
 import com.google.common.base.CaseFormat;
 import com.mitchellbosecke.pebble.PebbleEngine;
 import com.mitchellbosecke.pebble.error.PebbleException;
 import com.mitchellbosecke.pebble.loader.FileLoader;
 import com.mitchellbosecke.pebble.loader.StringLoader;
 import com.mitchellbosecke.pebble.template.PebbleTemplate;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.net.MalformedURLException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang.StringUtils;
 import org.apache.maven.archetype.ArchetypeManager;
 import org.apache.maven.archetype.catalog.Archetype;
 import org.apache.maven.archetype.catalog.ArchetypeCatalog;
 import org.apache.maven.execution.MavenSession;
-import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -34,40 +60,13 @@ import org.seedstack.maven.components.prompter.Value;
 import org.seedstack.maven.components.resolver.ArtifactResolver;
 import org.seedstack.maven.components.templating.SeedStackExtension;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.StringWriter;
-import java.io.Writer;
-import java.net.MalformedURLException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
-import static org.twdata.maven.mojoexecutor.MojoExecutor.artifactId;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.configuration;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.element;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.executeMojo;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.executionEnvironment;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.goal;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.groupId;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.name;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.plugin;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
-
 /**
  * Defines the generate goal. This goal generates a SeedStack project from existing archetypes.
  *
  * @author adrien.lauer@mpsa.com
  */
 @Mojo(name = "generate", requiresProject = false)
-public class GenerateMojo extends AbstractMojo {
+public class GenerateMojo extends AbstractSeedStackMojo {
     private static final String ARCHETYPE_PLUGIN_GROUP_ID = "org.apache.maven.plugins";
     private static final String ARCHETYPE_PLUGIN_ARTIFACT_ID = "maven-archetype-plugin";
     private static final String SEEDSTACK_ORG = "http://seedstack.org/maven/";
@@ -83,13 +82,23 @@ public class GenerateMojo extends AbstractMojo {
     private ArtifactResolver artifactResolver;
     @Component
     private ArchetypeManager archetypeManager;
-    @Component
-    private Prompter prompter;
-    @Component
-    private Inquirer inquire;
+    @Component(hint = "basic")
+    private Prompter basicPrompter;
+    @Component(hint = "fancy")
+    private Prompter fancyPrompter;
+    @Component(hint = "basic")
+    private Inquirer basicInquirer;
+    @Component(hint = "fancy")
+    private Inquirer fancyInquirer;
+    private boolean basicMode;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
+        this.basicMode = !mavenSession.getUserProperties().getProperty("basicPrompt", "false").equals("false");
+        if (!basicMode) {
+            getLog().info("Hint: if enhanced prompt has issues on your system, try basic prompt by adding \"-DbasicPrompt\" to your command line");
+        }
+
         String type = mavenSession.getUserProperties().getProperty("type"),
                 distributionGroupId = mavenSession.getUserProperties().getProperty("distributionGroupId", "org.seedstack"),
                 distributionArtifactId = mavenSession.getUserProperties().getProperty("distributionArtifactId", "distribution"),
@@ -115,18 +124,18 @@ public class GenerateMojo extends AbstractMojo {
                 }
                 try {
                     // We have a list of possible types, let the user choose
-                    ArrayList<String> list = new ArrayList<>(findProjectTypes(archetypeGroupId, archetypeVersion, remoteCatalog));
+                    List<Value> list = new ArrayList<>(findProjectTypes(archetypeGroupId, archetypeVersion, remoteCatalog));
                     Collections.sort(list);
-                    list.add("custom archetype");
-                    type = prompter.promptList("Choose the project type", Value.convertList(list));
+                    list.add(new Value("custom archetype", "custom"));
+                    type = getPrompter().promptList("Choose the project type", list);
 
                     // If the user wants to input a custom archetype
-                    if ("custom archetype".equals(type)) {
+                    if ("custom".equals(type)) {
                         // Ask for archetype group id (defaults to distribution group id)
-                        archetypeGroupId = prompter.promptInput("Enter the archetype group id", archetypeGroupId);
+                        archetypeGroupId = getPrompter().promptInput("Enter the archetype group id", archetypeGroupId);
                         // Ask for archetype artifact id
                         while (archetypeArtifactId == null || archetypeArtifactId.isEmpty()) {
-                            archetypeArtifactId = prompter.promptInput("Enter the archetype artifact id", null);
+                            archetypeArtifactId = getPrompter().promptInput("Enter the archetype artifact id", null);
                         }
                         // Ask for archetype version (defaults to latest)
                         try {
@@ -134,7 +143,7 @@ public class GenerateMojo extends AbstractMojo {
                         } catch (Exception e) {
                             archetypeVersion = null;
                         }
-                        archetypeVersion = prompter.promptInput("Enter the archetype version", archetypeVersion);
+                        archetypeVersion = getPrompter().promptInput("Enter the archetype version", archetypeVersion);
                     } else {
                         archetypeArtifactId = String.format("%s-archetype", type);
                     }
@@ -163,13 +172,13 @@ public class GenerateMojo extends AbstractMojo {
         String artifactId = mavenSession.getUserProperties().getProperty("artifactId");
         try {
             if (StringUtils.isBlank(groupId)) {
-                groupId = prompter.promptInput("Generated project group id", "org.generated.project");
+                groupId = getPrompter().promptInput("Generated project group id", "org.generated.project");
             }
             if (StringUtils.isBlank(groupId)) {
                 throw new MojoExecutionException("Generated project group id cannot be blank");
             }
             if (StringUtils.isBlank(artifactId)) {
-                artifactId = prompter.promptInput("Generated project artifact id", "my-" + (StringUtils.isBlank(type) ? "" : type + "-") + "project");
+                artifactId = getPrompter().promptInput("Generated project artifact id", "my-" + (StringUtils.isBlank(type) ? "" : type + "-") + "project");
             }
             if (StringUtils.isBlank(artifactId)) {
                 throw new MojoExecutionException("Generated project artifact id cannot be blank");
@@ -239,24 +248,14 @@ public class GenerateMojo extends AbstractMojo {
             archetypeVars.put("version", archetypeVersion);
             vars.put("archetype", archetypeVars);
 
-            Thread shutdownRender = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    renderTemplates(projectDir, vars);
-                    if (questionFile.exists() && questionFile.canRead() && !questionFile.delete()) {
-                        getLog().warn("Unable to delete question file, useless files may be still be present in project");
-                    }
-                }
-            }, "render-hook");
-
             // If the user cancels during question, complete the process with minimal vars
-            Runtime.getRuntime().addShutdownHook(shutdownRender);
+            Thread shutdownRender = setupInquiryCancelHook(projectDir, questionFile, vars);
 
             // Inquire from user if a question file is present
             HashMap<String, Object> varsWithAnswers = new HashMap<>(vars);
             try {
                 if (questionFile.exists() && questionFile.canRead()) {
-                    varsWithAnswers.putAll(inquire.inquire(questionFile.toURI().toURL()));
+                    varsWithAnswers.putAll(getInquirer().inquire(questionFile.toURI().toURL()));
                     if (!questionFile.delete()) {
                         getLog().warn("Unable to delete question file, useless files may be still be present in project");
                     }
@@ -265,11 +264,41 @@ public class GenerateMojo extends AbstractMojo {
                 getLog().error("Unable to process question file, resulting project might be unusable", e);
             }
 
-            // We can now do the rendering properly, cancel the shutdown hook
+            // We can now do the rendering properly, without asking anymore question, cancel the shutdown hooks
             Runtime.getRuntime().removeShutdownHook(shutdownRender);
 
             renderTemplates(projectDir, varsWithAnswers);
         }
+    }
+
+    private Thread setupBasicPromptHintHook() {
+        Thread basicPromptHook = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                if (!basicMode) {
+                    getLog().info("Hint: if you experience prompting issues, try the basic prompt instead by adding \"-DbasicPrompt\" to your command line");
+                }
+            }
+        }, "basic-prompt-hook");
+        Runtime.getRuntime().addShutdownHook(basicPromptHook);
+        return basicPromptHook;
+    }
+
+
+
+    private Thread setupInquiryCancelHook(final File projectDir, final File questionFile, final HashMap<String, Object> vars) {
+        Thread shutdownRender = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                getLog().warn("Inquiry has been interrupted, trying to render project as-is");
+                renderTemplates(projectDir, vars);
+                if (questionFile.exists() && questionFile.canRead() && !questionFile.delete()) {
+                    getLog().warn("Unable to delete question file, useless files may be still be present in project");
+                }
+            }
+        }, "render-hook");
+        Runtime.getRuntime().addShutdownHook(shutdownRender);
+        return shutdownRender;
     }
 
     private void renderTemplates(File file, Map<String, Object> vars) {
@@ -330,8 +359,8 @@ public class GenerateMojo extends AbstractMojo {
         }
     }
 
-    private Set<String> findProjectTypes(String archetypeGroupId, String archetypeVersion, String remoteCatalog) {
-        Set<String> possibleTypes = new HashSet<>();
+    private Set<Value> findProjectTypes(String archetypeGroupId, String archetypeVersion, String remoteCatalog) {
+        Set<Value> possibleTypes = new HashSet<>();
         getLog().info("Searching for " + archetypeVersion + " archetypes in remote catalog " + remoteCatalog);
         possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getRemoteCatalog(remoteCatalog)));
 
@@ -345,26 +374,42 @@ public class GenerateMojo extends AbstractMojo {
         }
         if (possibleTypes.isEmpty()) {
             getLog().warn("No " + archetypeVersion + " archetype found anywhere (check your Maven proxy settings), falling back to hard-coded list");
-            possibleTypes.add("addon");
-            possibleTypes.add("batch");
-            possibleTypes.add("cli");
-            possibleTypes.add("domain");
-            possibleTypes.add("web");
+            possibleTypes.add(new Value("addon"));
+            possibleTypes.add(new Value("batch"));
+            possibleTypes.add(new Value("cli"));
+            possibleTypes.add(new Value("domain"));
+            possibleTypes.add(new Value("web"));
         }
 
         return possibleTypes;
     }
 
-    private Set<String> findArchetypes(String archetypeGroupId, String archetypeVersion, ArchetypeCatalog catalog) {
-        Set<String> possibleTypes = new HashSet<>();
+    private Set<Value> findArchetypes(String archetypeGroupId, String archetypeVersion, ArchetypeCatalog catalog) {
+        Set<Value> possibleTypes = new HashSet<>();
         for (Archetype archetype : catalog.getArchetypes()) {
             if (archetypeGroupId.equals(archetype.getGroupId()) && archetypeVersion.equals(archetype.getVersion())) {
                 String artifactId = archetype.getArtifactId();
                 if (artifactId.endsWith("-archetype")) {
-                    possibleTypes.add(artifactId.substring(0, artifactId.length() - 10));
+                    possibleTypes.add(new Value(artifactId.substring(0, artifactId.length() - 10)));
                 }
             }
         }
         return possibleTypes;
+    }
+
+    private Prompter getPrompter() {
+        if (basicMode) {
+            return basicPrompter;
+        } else {
+            return fancyPrompter;
+        }
+    }
+
+    private Inquirer getInquirer() {
+        if (basicMode) {
+            return basicInquirer;
+        } else {
+            return fancyInquirer;
+        }
     }
 }

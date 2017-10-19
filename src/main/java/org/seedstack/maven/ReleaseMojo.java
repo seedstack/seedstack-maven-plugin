@@ -46,7 +46,7 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
  * @author adrien.lauer@gmail.com
  */
 @Mojo(name = "release", requiresProject = true, threadSafe = false, aggregator = true)
-public class ReleaseMojo extends AbstractMojo {
+public class ReleaseMojo extends AbstractSeedStackMojo {
     public static final String SNAPSHOT_SUFFIX = "-SNAPSHOT";
 
     @Component

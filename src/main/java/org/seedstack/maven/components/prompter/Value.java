@@ -5,14 +5,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 package org.seedstack.maven.components.prompter;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class Value {
-    private String name;
+public class Value implements Comparable<Value> {
     private String label;
+    private String name;
     private Character key;
     private boolean separator;
 
@@ -20,6 +21,38 @@ public class Value {
     }
 
     public Value(String label) {
+        this.label = label;
+        this.name = label;
+        this.key = null;
+        this.separator = false;
+    }
+
+    public Value(String label, String name) {
+        this.label = label;
+        this.name = name;
+        this.key = null;
+        this.separator = false;
+    }
+
+    public Value(String label, String name, Character key) {
+        this.label = label;
+        this.name = name;
+        this.key = key;
+        this.separator = false;
+    }
+
+    public Value(String label, boolean separator) {
+        this.label = label;
+        this.name = label;
+        this.key = null;
+        this.separator = separator;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
         this.label = label;
     }
 
@@ -29,14 +62,6 @@ public class Value {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public String getLabel() {
-        return label;
-    }
-
-    public void setLabel(String label) {
-        this.label = label;
     }
 
     public Character getKey() {
@@ -55,12 +80,28 @@ public class Value {
         this.separator = separator;
     }
 
-    public static List<Value> convertList(List<String> values) {
+    public static List<Value> convertStrings(List<String> values) {
         List<Value> result = new ArrayList<>();
         for (String value : values) {
             result.add(new Value(value));
         }
         return result;
+    }
+
+    public static List<String> convertValues(List<Value> values) {
+        List<String> result = new ArrayList<>();
+        for (Value value : values) {
+            result.add(value.getName());
+        }
+        return result;
+    }
+
+    @Override
+    public int compareTo(Value o) {
+        if (o == null) {
+            throw new NullPointerException("Attempt to compare to null value");
+        }
+        return this.label.compareTo(o.label);
     }
 }
 

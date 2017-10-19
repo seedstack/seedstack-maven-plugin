@@ -28,7 +28,7 @@ import java.util.List;
 /**
  * Provides a common base for mojos that run SeedStack applications.
  */
-public class AbstractExecutableMojo extends AbstractMojo {
+public class AbstractExecutableMojo extends AbstractSeedStackMojo {
 
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;

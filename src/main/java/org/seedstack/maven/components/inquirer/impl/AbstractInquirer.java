@@ -5,27 +5,28 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package org.seedstack.maven.components.inquirer;
+
+package org.seedstack.maven.components.inquirer.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
-import org.fusesource.jansi.Ansi;
-import org.seedstack.maven.components.prompter.PromptException;
-import org.seedstack.maven.components.prompter.Prompter;
-
-import javax.inject.Inject;
 import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.fusesource.jansi.Ansi;
+import org.seedstack.maven.components.inquirer.AnswerValidationException;
+import org.seedstack.maven.components.inquirer.Condition;
+import org.seedstack.maven.components.inquirer.Inquirer;
+import org.seedstack.maven.components.inquirer.InquirerException;
+import org.seedstack.maven.components.inquirer.Inquiry;
+import org.seedstack.maven.components.inquirer.Question;
+import org.seedstack.maven.components.inquirer.QuestionGroup;
+import org.seedstack.maven.components.prompter.PromptException;
+import org.seedstack.maven.components.prompter.Prompter;
 
-@Component(role = Inquirer.class)
-public class ConsoleUIInquirer implements Inquirer {
-    @Requirement
-    private Prompter prompter;
+public abstract class AbstractInquirer implements Inquirer {
     private ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -78,15 +79,15 @@ public class ConsoleUIInquirer implements Inquirer {
                 Question.Type type = question.getType();
                 switch (question.getStyle()) {
                     case CONFIRM:
-                        return prompter.promptConfirmation(message, defaultValue);
+                        return getPrompter().promptConfirmation(message, defaultValue);
                     case INPUT:
-                        return coerce(prompter.promptInput(message, defaultValue), type);
+                        return coerce(getPrompter().promptInput(message, defaultValue), type);
                     case CHECKBOX:
-                        return coerce(prompter.promptCheckbox(message, question.getValues()), type);
+                        return coerce(getPrompter().promptCheckbox(message, question.getValues()), type);
                     case LIST:
-                        return coerce(prompter.promptList(message, question.getValues()), type);
+                        return coerce(getPrompter().promptList(message, question.getValues()), type);
                     case CHOICE:
-                        return coerce(prompter.promptChoice(message, question.getValues()), type);
+                        return coerce(getPrompter().promptChoice(message, question.getValues()), type);
                     default:
                         return null;
                 }
@@ -145,4 +146,6 @@ public class ConsoleUIInquirer implements Inquirer {
                 return value;
         }
     }
+
+    protected abstract Prompter getPrompter();
 }

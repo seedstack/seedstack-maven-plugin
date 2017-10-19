@@ -5,7 +5,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package org.seedstack.maven.components.prompter;
+
+package org.seedstack.maven.components.prompter.impl;
 
 import de.codeshelf.consoleui.elements.ConfirmChoice;
 import de.codeshelf.consoleui.prompt.CheckboxResult;
@@ -21,20 +22,17 @@ import de.codeshelf.consoleui.prompt.builder.ExpandableChoicePromptBuilder;
 import de.codeshelf.consoleui.prompt.builder.InputValueBuilder;
 import de.codeshelf.consoleui.prompt.builder.ListPromptBuilder;
 import de.codeshelf.consoleui.prompt.builder.PromptBuilder;
-import org.codehaus.plexus.component.annotations.Component;
-import org.fusesource.jansi.AnsiConsole;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.codehaus.plexus.component.annotations.Component;
+import org.seedstack.maven.components.prompter.PromptException;
+import org.seedstack.maven.components.prompter.Prompter;
+import org.seedstack.maven.components.prompter.Value;
 
-@Component(role = Prompter.class)
+@Component(role = Prompter.class, hint = "fancy")
 public class ConsoleUIPrompter implements Prompter {
-    static {
-        AnsiConsole.systemInstall();
-    }
-
     @Override
     public String promptChoice(String message, List<Value> values) throws PromptException {
         ConsolePrompt consolePrompt = new ConsolePrompt();
@@ -43,11 +41,16 @@ public class ConsoleUIPrompter implements Prompter {
                 .name("dummy")
                 .message(message);
         for (Value value : values) {
-            choicePromptBuilder.newItem()
-                    .name(value.getName())
-                    .message(value.getLabel())
-                    .key(value.getKey())
-                    .add();
+            if (value.isSeparator()) {
+                choicePromptBuilder.newSeparator(value.getLabel())
+                        .add();
+            } else {
+                choicePromptBuilder.newItem()
+                        .name(value.getName())
+                        .message(value.getLabel())
+                        .key(value.getKey())
+                        .add();
+            }
         }
         choicePromptBuilder.addPrompt();
         return ((ExpandableChoiceResult) extractAnswer(consolePrompt, promptBuilder)).getSelectedId();
@@ -109,14 +112,17 @@ public class ConsoleUIPrompter implements Prompter {
                 .name("dummy")
                 .message(message);
         if (defaultValue != null) {
-            confirmPromptBuilder.defaultValue(ConfirmChoice.ConfirmationValue.valueOf(defaultValue.toUpperCase(Locale.ENGLISH)));
+            confirmPromptBuilder.defaultValue(ConfirmChoice.ConfirmationValue.valueOf(
+                    defaultValue.toUpperCase(Locale.ENGLISH)));
         }
         confirmPromptBuilder.addPrompt();
-        return ((ConfirmResult) extractAnswer(consolePrompt, promptBuilder)).getConfirmed() == ConfirmChoice.ConfirmationValue.YES;
+        return ((ConfirmResult) extractAnswer(consolePrompt,
+                promptBuilder)).getConfirmed() == ConfirmChoice.ConfirmationValue.YES;
     }
 
     @SuppressWarnings("unchecked")
-    private <T extends PromtResultItemIF> T extractAnswer(ConsolePrompt consolePrompt, PromptBuilder promptBuilder) throws PromptException {
+    private <T extends PromtResultItemIF> T extractAnswer(ConsolePrompt consolePrompt,
+            PromptBuilder promptBuilder) throws PromptException {
         try {
             return (T) consolePrompt.prompt(promptBuilder.build()).values().iterator().next();
         } catch (IOException e) {

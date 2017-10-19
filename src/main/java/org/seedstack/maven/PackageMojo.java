@@ -45,7 +45,7 @@ import java.util.zip.ZipException;
  * @author adrien.lauer@gmail.com
  */
 @Mojo(name = "package", threadSafe = true, defaultPhase = LifecyclePhase.PACKAGE)
-public class PackageMojo extends AbstractMojo {
+public class PackageMojo extends AbstractSeedStackMojo {
     private static final String CAPSULE_GROUP_ID = "co.paralleluniverse";
     private static final String CAPSULE_ARTIFACT_ID = "capsule";
     private static final String CAPSULE_CLASS = "Capsule";
