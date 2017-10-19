@@ -1,4 +1,4 @@
-# Version 2.6.2 (2017-10-19)
+# Version 2.6.3 (2017-10-19)
 
 * [new] Add basic prompt mode (-DbasicPrompt) on generate goal, for the case where ConsoleUI doesn't work properly.
 * [chg] If an archetype named "web" exists, set it as the default project type.
