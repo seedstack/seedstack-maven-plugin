@@ -8,7 +8,6 @@
 package org.seedstack.maven;
 
 import org.apache.maven.execution.MavenSession;
-import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -187,7 +186,7 @@ public class PackageMojo extends AbstractSeedStackMojo {
         mainAttributes.put(Attributes.Name.MANIFEST_VERSION, "1.0");
         mainAttributes.put(Attributes.Name.MAIN_CLASS, SEEDSTACK_CAPLET_CLASS);
         mainAttributes.put(new Attributes.Name(PREMAIN_CLASS), SEEDSTACK_CAPLET_CLASS);
-        mainAttributes.put(new Attributes.Name(APPLICATION_CLASS), SeedStackConstants.mainClassName);
+        mainAttributes.put(new Attributes.Name(APPLICATION_CLASS), SeedStackUtils.mainClassName);
         mainAttributes.put(new Attributes.Name(APPLICATION_NAME), this.getOutputName());
 
         if (allowSnapshots != null) {

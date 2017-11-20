@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 package org.seedstack.maven;
 
 import org.apache.maven.plugin.MojoExecutionException;
@@ -16,14 +17,16 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.seedstack.maven.runnables.ToolLauncherRunnable;
 
 /**
- * Defines the config goal. This goal runs the config Seed tool which displays all configuration options for the application.
+ * Defines the config goal. This goal runs the config Seed tool which displays all configuration options for the
+ * application.
  */
-@Mojo(name = "config", requiresProject = true, threadSafe = true, defaultPhase = LifecyclePhase.VALIDATE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
+@Mojo(name = "config", requiresProject = true, threadSafe = true, defaultPhase = LifecyclePhase.VALIDATE,
+        requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 @Execute(phase = LifecyclePhase.PROCESS_CLASSES)
 public class ConfigMojo extends AbstractExecutableMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        runnable = new ToolLauncherRunnable("config", getArgs(), getMonitor(), getLog());
-        super.execute();
+        execute(new ToolLauncherRunnable("config", getArgs(), getMonitor(), getLog()), false);
+        waitForShutdown();
     }
 }
