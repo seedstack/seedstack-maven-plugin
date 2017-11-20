@@ -5,12 +5,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package org.seedstack.maven;
 
-/**
- * SeedStack useful constants.
- */
-public class SeedStackConstants {
-    public static final String seedClassName = "org.seedstack.seed.core.Seed";
-    public static final String mainClassName = "org.seedstack.seed.core.SeedMain";
+package org.seedstack.maven.watcher;
+
+import java.util.Set;
+
+public interface FileChangeListener {
+    void onChange(Set<FileEvent> fileEvents);
 }

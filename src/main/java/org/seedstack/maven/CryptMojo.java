@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 package org.seedstack.maven;
 
 import org.apache.maven.plugin.MojoExecutionException;
@@ -19,12 +20,13 @@ import org.seedstack.maven.runnables.ToolLauncherRunnable;
  * Defines the crypt goal. This goal runs the crypt Seed tool which crypts the given argument using a key/pair in
  * the master keystore of the application.
  */
-@Mojo(name = "crypt", requiresProject = true, threadSafe = true, defaultPhase = LifecyclePhase.VALIDATE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
+@Mojo(name = "crypt", requiresProject = true, threadSafe = true, defaultPhase = LifecyclePhase.VALIDATE,
+        requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 @Execute(phase = LifecyclePhase.PROCESS_CLASSES)
 public class CryptMojo extends AbstractExecutableMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        runnable = new ToolLauncherRunnable("crypt", getArgs(), getMonitor(), getLog());
-        super.execute();
+        execute(new ToolLauncherRunnable("crypt", getArgs(), getMonitor(), getLog()), false);
+        waitForShutdown();
     }
 }

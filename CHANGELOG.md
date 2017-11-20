@@ -1,3 +1,7 @@
+# Version 2.7.0 (2017-11-31)
+
+* [new] Add watch goal which automatically refreshes the application when a source file change.
+
 # Version 2.6.4 (2017-10-19)
 
 * [fix] Uninstall ansi console before exiting.

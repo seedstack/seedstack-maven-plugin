@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 package org.seedstack.maven;
 
 import org.apache.maven.plugin.MojoExecutionException;
@@ -19,16 +20,13 @@ import org.seedstack.maven.runnables.ToolLauncherRunnable;
  * Defines the effective-test-config goal. This goal runs the effective-config Seed tool with the test classpath,
  * which dumps the effective test configuration.
  */
-@Mojo(name = "effective-test-config", requiresProject = true, threadSafe = true, defaultPhase = LifecyclePhase.VALIDATE, requiresDependencyResolution = ResolutionScope.TEST)
+@Mojo(name = "effective-test-config", requiresProject = true, threadSafe = true, defaultPhase = LifecyclePhase
+        .VALIDATE, requiresDependencyResolution = ResolutionScope.TEST)
 @Execute(phase = LifecyclePhase.PROCESS_TEST_CLASSES)
 public class EffectiveTestConfigMojo extends AbstractExecutableMojo {
-    public EffectiveTestConfigMojo() {
-        enableTestMode();
-    }
-
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        runnable = new ToolLauncherRunnable("effective-config", getArgs(), getMonitor(), getLog());
-        super.execute();
+        execute(new ToolLauncherRunnable("effective-config", getArgs(), getMonitor(), getLog()), true);
+        waitForShutdown();
     }
 }
