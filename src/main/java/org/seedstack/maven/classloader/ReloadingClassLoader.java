@@ -5,7 +5,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-
 package org.seedstack.maven.classloader;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,9 +12,13 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.ByteBuffer;
 import java.security.AccessControlContext;
 import java.security.AccessController;
+import java.security.CodeSigner;
+import java.security.CodeSource;
 import java.security.PrivilegedExceptionAction;
+import java.security.SecureClassLoader;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -26,7 +29,7 @@ import org.apache.maven.plugin.logging.Log;
 import sun.misc.Resource;
 import sun.misc.URLClassPath;
 
-public class HotSwapURLClassLoader extends URLClassLoader {
+public class ReloadingClassLoader extends URLClassLoader {
     private final AccessControlContext acc = AccessController.getContext();
     private final URLClassPath ucp;
     private final ObjectMapper objectMapper;
@@ -34,7 +37,7 @@ public class HotSwapURLClassLoader extends URLClassLoader {
     private final Map<String, DisposableClassLoader> classLoaders = new HashMap<>();
     private final Log log;
 
-    public HotSwapURLClassLoader(Log log, URL[] urls) {
+    public ReloadingClassLoader(Log log, URL[] urls) {
         super(urls);
         this.log = log;
         this.ucp = new URLClassPath(urls);
@@ -77,7 +80,7 @@ public class HotSwapURLClassLoader extends URLClassLoader {
                             String path = name.replace('.', '/').concat(".class");
                             Resource res = ucp.getResource(path, false);
                             if (res != null) {
-                                return new DisposableClassLoader(HotSwapURLClassLoader.this, name, res);
+                                return new DisposableClassLoader(name, res);
                             } else {
                                 return null;
                             }
@@ -125,6 +128,51 @@ public class HotSwapURLClassLoader extends URLClassLoader {
         } catch (IOException e) {
             throw new RuntimeException(
                     "Unable to retrieve content of application configuration file: " + url.toExternalForm(), e);
+        }
+    }
+
+    private class DisposableClassLoader extends SecureClassLoader {
+        private final Resource res;
+        private final String name;
+
+        DisposableClassLoader(String name, Resource res) {
+            this.name = name;
+            this.res = res;
+        }
+
+        @Override
+        public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if (this.name.equals(name)) {
+                synchronized (getClassLoadingLock(name)) {
+                    // First, check if the class has already been loaded
+                    Class<?> c = findLoadedClass(name);
+                    if (c == null) {
+                        try {
+                            ByteBuffer byteBuffer = res.getByteBuffer();
+                            if (byteBuffer != null) {
+                                // Use (direct) ByteBuffer:
+                                CodeSigner[] signers = res.getCodeSigners();
+                                CodeSource cs = new CodeSource(res.getURL(), signers);
+                                c = defineClass(name, byteBuffer, cs);
+                            } else {
+                                byte[] b = res.getBytes();
+                                // must read certificates AFTER reading bytes.
+                                CodeSigner[] signers = res.getCodeSigners();
+                                CodeSource cs = new CodeSource(res.getURL(), signers);
+                                c = defineClass(name, b, 0, b.length, cs);
+                            }
+                        } catch (IOException e) {
+                            throw new ClassNotFoundException(name, e);
+                        }
+                        if (resolve) {
+                            resolveClass(c);
+                        }
+                    }
+                    return c;
+                }
+            } else {
+                return ReloadingClassLoader.this.loadClass(name, resolve);
+            }
         }
     }
 }

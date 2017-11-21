@@ -40,7 +40,7 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.MethodVisitor;
-import org.seedstack.maven.classloader.HotSwapURLClassLoader;
+import org.seedstack.maven.classloader.ReloadingClassLoader;
 import org.seedstack.maven.runnables.DefaultLauncherRunnable;
 import org.seedstack.maven.watcher.AggregatingFileChangeListener;
 import org.seedstack.maven.watcher.DirectoryWatcher;
@@ -57,7 +57,7 @@ public class WatchMojo extends AbstractExecutableMojo {
     private Thread watcherThread;
     private AggregatingFileChangeListener fileChangeListener;
     private List<String> compileSourceRoots;
-    private HotSwapURLClassLoader hotSwapURLClassLoader;
+    private ReloadingClassLoader reloadingClassLoader;
     private DefaultLauncherRunnable launcherRunnable;
 
     @Override
@@ -106,26 +106,37 @@ public class WatchMojo extends AbstractExecutableMojo {
 
     @Override
     URLClassLoader getClassLoader(final URL[] classPathUrls) {
-        hotSwapURLClassLoader = AccessController.doPrivileged(new PrivilegedAction<HotSwapURLClassLoader>() {
-            public HotSwapURLClassLoader run() {
-                return new HotSwapURLClassLoader(getLog(), classPathUrls);
+        reloadingClassLoader = AccessController.doPrivileged(new PrivilegedAction<ReloadingClassLoader>() {
+            public ReloadingClassLoader run() {
+                return new ReloadingClassLoader(getLog(), classPathUrls);
             }
         });
-        return hotSwapURLClassLoader;
+        return reloadingClassLoader;
     }
 
     private class WatchFileChangeListener extends AggregatingFileChangeListener {
         @Override
         public void onAggregatedChanges(Set<FileEvent> fileEvents) {
-
             try {
+                if (getLog().isDebugEnabled()) {
+                    for (FileEvent fileEvent : fileEvents) {
+                        getLog().debug(fileEvent.getKind().name() + ": " + fileEvent.getFile().getAbsolutePath());
+                    }
+                }
+
                 Set<File> compiledFilesToRemove = new HashSet<>();
                 Set<File> compiledFilesToUpdate = new HashSet<>();
+
                 analyzeEvents(fileEvents, compiledFilesToRemove, compiledFilesToUpdate);
-                hotSwapURLClassLoader.invalidateClasses(analyzeClasses(compiledFilesToRemove, compiledFilesToUpdate));
-                removeFiles(compiledFilesToRemove);
-                recompile();
-                launcherRunnable.refresh();
+
+                if (!compiledFilesToRemove.isEmpty() || !compiledFilesToUpdate.isEmpty()) {
+                    reloadingClassLoader.invalidateClasses(
+                            analyzeClasses(compiledFilesToRemove, compiledFilesToUpdate)
+                    );
+                    removeFiles(compiledFilesToRemove);
+                    recompile();
+                    launcherRunnable.refresh();
+                }
             } catch (Exception e) {
                 Throwable toLog = e.getCause();
                 if (toLog == null || !toLog.getClass().getName()

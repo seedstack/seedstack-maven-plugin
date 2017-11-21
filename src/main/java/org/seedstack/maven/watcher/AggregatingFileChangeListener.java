@@ -16,26 +16,27 @@ import java.util.concurrent.ArrayBlockingQueue;
 
 public abstract class AggregatingFileChangeListener implements FileChangeListener {
     private final ArrayBlockingQueue<FileEvent> pending = new ArrayBlockingQueue<>(10000);
-    private final Timer timer = new Timer();
+    private Timer timer;
     private boolean stop;
 
-    protected AggregatingFileChangeListener() {
-        this.timer.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                Set<FileEvent> aggregatedChangedFiles = new HashSet<>();
-                pending.drainTo(aggregatedChangedFiles);
-                if (!aggregatedChangedFiles.isEmpty()) {
-                    onAggregatedChanges(aggregatedChangedFiles);
-                }
-            }
-        }, 0, 250);
-    }
-
     @Override
-    public void onChange(Set<FileEvent> fileEvents) {
+    public void onChange(final Set<FileEvent> fileEvents) {
         if (!stop) {
+            if (this.timer != null) {
+                this.timer.cancel();
+            }
+
             pending.addAll(fileEvents);
+
+            this.timer = new Timer();
+            this.timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    HashSet<FileEvent> aggregatedFileEvents = new HashSet<>();
+                    pending.drainTo(aggregatedFileEvents);
+                    onAggregatedChanges(aggregatedFileEvents);
+                }
+            }, 500);
         }
     }
 
