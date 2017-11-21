@@ -41,6 +41,7 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.seedstack.maven.classloader.ReloadingClassLoader;
+import org.seedstack.maven.livereload.LRServer;
 import org.seedstack.maven.runnables.DefaultLauncherRunnable;
 import org.seedstack.maven.watcher.AggregatingFileChangeListener;
 import org.seedstack.maven.watcher.DirectoryWatcher;
@@ -53,12 +54,14 @@ import org.seedstack.maven.watcher.FileEvent;
         requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 @Execute(phase = LifecyclePhase.PROCESS_CLASSES)
 public class WatchMojo extends AbstractExecutableMojo {
+    public static final int LIVE_RELOAD_PORT = 35729;
     private DirectoryWatcher directoryWatcher;
     private Thread watcherThread;
     private AggregatingFileChangeListener fileChangeListener;
     private List<String> compileSourceRoots;
     private ReloadingClassLoader reloadingClassLoader;
     private DefaultLauncherRunnable launcherRunnable;
+    private LRServer lrServer;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
@@ -82,11 +85,11 @@ public class WatchMojo extends AbstractExecutableMojo {
             }
         }
 
-        this.watcherThread = new Thread(this.directoryWatcher);
+        this.watcherThread = new Thread(this.directoryWatcher, "watcher");
         this.launcherRunnable = new DefaultLauncherRunnable(getArgs(), getMonitor(), getLog());
         execute(launcherRunnable, false);
 
-        Runtime.getRuntime().addShutdownHook(new Thread() {
+        Runtime.getRuntime().addShutdownHook(new Thread("watcher") {
             @Override
             public void run() {
                 fileChangeListener.stop();
@@ -100,8 +103,26 @@ public class WatchMojo extends AbstractExecutableMojo {
             }
         });
 
+        // Start live reload server
+        try {
+            getLog().info("Starting LiveReload server on port " + LIVE_RELOAD_PORT);
+            lrServer = new LRServer(LIVE_RELOAD_PORT);
+            lrServer.start();
+        } catch (Exception e) {
+            getLog().error("Unable to start LiveReload server", e);
+        }
+
+        // Start watching sources
         this.watcherThread.start();
         waitForShutdown();
+
+        if (lrServer != null) {
+            try {
+                lrServer.stop();
+            } catch (Exception e) {
+                getLog().error("Unable to stop LiveReload server", e);
+            }
+        }
     }
 
     @Override
@@ -136,6 +157,10 @@ public class WatchMojo extends AbstractExecutableMojo {
                     removeFiles(compiledFilesToRemove);
                     recompile();
                     launcherRunnable.refresh();
+                    if (lrServer != null) {
+                        getLog().info("Triggering LiveReload");
+                        lrServer.notifyChange("/");
+                    }
                 }
             } catch (Exception e) {
                 Throwable toLog = e.getCause();

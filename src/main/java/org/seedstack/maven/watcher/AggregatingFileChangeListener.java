@@ -42,7 +42,9 @@ public abstract class AggregatingFileChangeListener implements FileChangeListene
 
     public void stop() {
         stop = true;
-        timer.cancel();
+        if (timer != null) {
+            timer.cancel();
+        }
     }
 
     protected abstract void onAggregatedChanges(Set<FileEvent> fileEvents);

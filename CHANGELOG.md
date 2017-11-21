@@ -1,6 +1,7 @@
 # Version 2.7.0 (2017-11-31)
 
 * [new] Add watch goal which automatically refreshes the application when a source file change.
+* [new] Support for [LiveReload](http://livereload.com/) on the watch goal.
 
 # Version 2.6.4 (2017-10-19)
 

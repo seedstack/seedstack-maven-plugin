@@ -34,11 +34,26 @@
         <bintray.package>seedstack-maven-plugin</bintray.package>
 
         <compatibility.skip>true</compatibility.skip>
+        <jetty-server.version>8.1.8.v20121106</jetty-server.version>
     </properties>
 
     <build>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>com.mycila</groupId>
+                    <artifactId>license-maven-plugin</artifactId>
+                    <version>${mycila.license-maven-plugin.version}</version>
+                    <configuration>
+                        <excludes>
+                            <exclude>AUTHORS</exclude>
+                            <exclude>CONTRIBUTORS</exclude>
+                            <exclude>LICENSE</exclude>
+                            <exclude>**/src/license/THIRD-PARTY.properties</exclude>
+                            <exclude>**/src/main/resources/livereload.js</exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>license-maven-plugin</artifactId>
@@ -61,15 +76,17 @@
                             <licenseMerge>Apache 2|Apache License, Version 2.0</licenseMerge>
                             <licenseMerge>Apache 2|Apache Public License 2.0</licenseMerge>
                             <licenseMerge>Apache 2|Unknown license</licenseMerge>
+                            <licenseMerge>Apache 2|Apache Software License - Version 2.0</licenseMerge>
                             <licenseMerge>BSD|BSD 3-Clause License</licenseMerge>
                             <licenseMerge>BSD|BSD style modified by Coverity</licenseMerge>
                             <licenseMerge>BSD|The BSD License</licenseMerge>
-                            <licenseMerge>CDDL 1.0|COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0
-                            </licenseMerge>
+                            <licenseMerge>CDDL 1.0|COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0</licenseMerge>
                             <licenseMerge>CPL 1.0|Common Public License Version 1.0</licenseMerge>
                             <licenseMerge>EPL 1.0|Eclipse Public License, Version 1.0</licenseMerge>
+                            <licenseMerge>EPL 1.0|Eclipse Public License - Version 1.0</licenseMerge>
                             <licenseMerge>MIT|MIT License</licenseMerge>
                             <licenseMerge>MPL|Mozilla Public License 1.1 (MPL 1.1)</licenseMerge>
+                            <licenseMerge>Public Domain|Public domain (Unlicense)</licenseMerge>
                         </licenseMerges>
                     </configuration>
                 </plugin>
@@ -238,6 +255,21 @@
             <groupId>asm</groupId>
             <artifactId>asm</artifactId>
             <version>3.3.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+            <version>${jetty-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-websocket</artifactId>
+            <version>${jetty-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.googlecode.json-simple</groupId>
+            <artifactId>json-simple</artifactId>
+            <version>1.1.1</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
