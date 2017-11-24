@@ -15,7 +15,10 @@ import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
 import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -25,12 +28,15 @@ import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.security.MessageDigest;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import org.apache.maven.plugin.logging.Log;
 
 public class DirectoryWatcher implements Runnable {
+    private final Map<File, byte[]> digests;
     private final Log log;
     private final FileChangeListener listener;
     private final WatchService watcher;
@@ -40,6 +46,7 @@ public class DirectoryWatcher implements Runnable {
     private boolean stop;
 
     public DirectoryWatcher(Log log, FileChangeListener listener) throws IOException {
+        this.digests = new HashMap<>();
         this.log = log;
         this.listener = listener;
         this.modifier = determineModifier();
@@ -77,10 +84,10 @@ public class DirectoryWatcher implements Runnable {
         if (trace) {
             Path prev = keys.get(key);
             if (prev == null) {
-                log.debug("New source directory: " + dir);
+                log.debug("Watching new directory: " + dir);
             } else {
                 if (!dir.equals(prev)) {
-                    log.debug("Source directory updated: " + dir);
+                    log.debug("Directory updated: " + dir);
                 }
             }
         }
@@ -95,6 +102,14 @@ public class DirectoryWatcher implements Runnable {
                 key = watcher.take();
             } catch (InterruptedException x) {
                 return;
+            }
+
+            try {
+                // Let the watcher aggregate events for 500 ms
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                stop = true;
+                continue;
             }
 
             Path dir = keys.get(key);
@@ -112,26 +127,29 @@ public class DirectoryWatcher implements Runnable {
 
                 WatchEvent<Path> ev = cast(event);
                 Path name = ev.context();
-                Path child = dir.resolve(name);
+                Path path = dir.resolve(name);
+                File file = path.toFile();
 
-                if (event.kind() == ENTRY_CREATE) {
-                    log.debug("New source file: " + child);
-                    fileEvents.add(new FileEvent(FileEvent.Kind.CREATE, child.toFile()));
-                } else if (event.kind() == ENTRY_MODIFY) {
-                    log.debug("Source file modified: " + child);
-                    fileEvents.add(new FileEvent(FileEvent.Kind.MODIFY, child.toFile()));
-                } else if (event.kind() == ENTRY_DELETE) {
-                    log.debug("Source file deleted: " + child);
-                    fileEvents.add(new FileEvent(FileEvent.Kind.DELETE, child.toFile()));
+                if (!file.isDirectory()) {
+                    if (event.kind() == ENTRY_CREATE && isReallyCreatedOrModified(file)) {
+                        log.debug("New file: " + path);
+                        fileEvents.add(new FileEvent(FileEvent.Kind.CREATE, file));
+                    } else if (event.kind() == ENTRY_MODIFY && isReallyCreatedOrModified(file)) {
+                        log.debug("File modified: " + path);
+                        fileEvents.add(new FileEvent(FileEvent.Kind.MODIFY, file));
+                    } else if (event.kind() == ENTRY_DELETE && isReallyDeleted(file)) {
+                        log.debug("File deleted: " + path);
+                        fileEvents.add(new FileEvent(FileEvent.Kind.DELETE, file));
+                    }
                 }
 
                 if (kind == ENTRY_CREATE) {
                     try {
-                        if (Files.isDirectory(child, NOFOLLOW_LINKS)) {
-                            watchRecursively(child);
+                        if (Files.isDirectory(path, NOFOLLOW_LINKS)) {
+                            watchRecursively(path);
                         }
                     } catch (IOException e) {
-                        log.error("Unable to watch " + child, e);
+                        log.error("Unable to watch " + path, e);
                     }
                 }
             }
@@ -150,8 +168,49 @@ public class DirectoryWatcher implements Runnable {
         }
     }
 
+    private boolean isReallyCreatedOrModified(File file) {
+        if (file.exists()) {
+            try {
+                byte[] knownDigest = digests.get(file);
+                byte[] newDigest = computeSha1(file);
+                digests.put(file, newDigest);
+                return !Arrays.equals(newDigest, knownDigest);
+            } catch (Exception e) {
+                log.warn("Unable to compute digest of file " + file.getAbsolutePath());
+                return true;
+            }
+        } else {
+            digests.remove(file);
+            return false;
+        }
+    }
+
+    private boolean isReallyDeleted(File file) {
+        if (!file.exists()) {
+            digests.remove(file);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     public void stop() {
         stop = true;
+    }
+
+    private byte[] computeSha1(File file) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-1");
+        try (InputStream fis = new FileInputStream(file)) {
+            int n = 0;
+            byte[] buffer = new byte[16384];
+            while (n != -1) {
+                n = fis.read(buffer);
+                if (n > 0) {
+                    digest.update(buffer, 0, n);
+                }
+            }
+        }
+        return digest.digest();
     }
 
     @SuppressWarnings("unchecked")

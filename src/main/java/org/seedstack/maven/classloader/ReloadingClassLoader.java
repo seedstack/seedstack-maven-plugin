@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 package org.seedstack.maven.classloader;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -68,6 +69,13 @@ public class ReloadingClassLoader extends URLClassLoader {
                     log.debug("Class " + classNameToInvalidate + " will be reloaded on next access");
                 }
             }
+        }
+    }
+
+    public void invalidateAllClasses() {
+        synchronized (classLoaders) {
+            classLoaders.clear();
+            log.debug("All classes will be reloaded on next access");
         }
     }
 

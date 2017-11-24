@@ -28,6 +28,8 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Semaphore;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Execute;
@@ -43,8 +45,8 @@ import org.objectweb.asm.MethodVisitor;
 import org.seedstack.maven.classloader.ReloadingClassLoader;
 import org.seedstack.maven.livereload.LRServer;
 import org.seedstack.maven.runnables.DefaultLauncherRunnable;
-import org.seedstack.maven.watcher.AggregatingFileChangeListener;
 import org.seedstack.maven.watcher.DirectoryWatcher;
+import org.seedstack.maven.watcher.FileChangeListener;
 import org.seedstack.maven.watcher.FileEvent;
 
 /**
@@ -57,7 +59,6 @@ public class WatchMojo extends AbstractExecutableMojo {
     public static final int LIVE_RELOAD_PORT = 35729;
     private DirectoryWatcher directoryWatcher;
     private Thread watcherThread;
-    private AggregatingFileChangeListener fileChangeListener;
     private List<String> compileSourceRoots;
     private ReloadingClassLoader reloadingClassLoader;
     private DefaultLauncherRunnable launcherRunnable;
@@ -66,9 +67,8 @@ public class WatchMojo extends AbstractExecutableMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         this.compileSourceRoots = Collections.unmodifiableList(getProject().getCompileSourceRoots());
-        this.fileChangeListener = new WatchFileChangeListener();
         try {
-            this.directoryWatcher = new DirectoryWatcher(getLog(), fileChangeListener);
+            this.directoryWatcher = new DirectoryWatcher(getLog(), new WatchFileChangeListener());
         } catch (IOException e) {
             throw new MojoExecutionException("Unable to create directory watcher", e);
         }
@@ -92,7 +92,6 @@ public class WatchMojo extends AbstractExecutableMojo {
         Runtime.getRuntime().addShutdownHook(new Thread("watcher") {
             @Override
             public void run() {
-                fileChangeListener.stop();
                 directoryWatcher.stop();
                 watcherThread.interrupt();
                 try {
@@ -135,32 +134,74 @@ public class WatchMojo extends AbstractExecutableMojo {
         return reloadingClassLoader;
     }
 
-    private class WatchFileChangeListener extends AggregatingFileChangeListener {
+    private class WatchFileChangeListener implements FileChangeListener {
+        private final Semaphore semaphore = new Semaphore(1);
+        private final ArrayBlockingQueue<FileEvent> pending = new ArrayBlockingQueue<>(10000);
+
         @Override
-        public void onAggregatedChanges(Set<FileEvent> fileEvents) {
-            try {
-                if (getLog().isDebugEnabled()) {
-                    for (FileEvent fileEvent : fileEvents) {
-                        getLog().debug(fileEvent.getKind().name() + ": " + fileEvent.getFile().getAbsolutePath());
+        public void onChange(Set<FileEvent> fileEvents) {
+            pending.addAll(fileEvents);
+            while (!pending.isEmpty()) {
+                boolean permit = false;
+                try {
+                    permit = semaphore.tryAcquire();
+                    if (permit) {
+                        HashSet<FileEvent> fileEventsToProcess = new HashSet<>();
+                        pending.drainTo(fileEventsToProcess);
+                        refresh(fileEventsToProcess);
+                    } else {
+                        pending.addAll(fileEvents);
+                    }
+                } finally {
+                    if (permit) {
+                        semaphore.release();
                     }
                 }
+            }
+        }
 
+        private void refresh(Set<FileEvent> fileEvents) {
+            try {
                 Set<File> compiledFilesToRemove = new HashSet<>();
                 Set<File> compiledFilesToUpdate = new HashSet<>();
 
-                analyzeEvents(fileEvents, compiledFilesToRemove, compiledFilesToUpdate);
+                boolean newFiles = analyzeEvents(fileEvents, compiledFilesToRemove, compiledFilesToUpdate);
 
-                if (!compiledFilesToRemove.isEmpty() || !compiledFilesToUpdate.isEmpty()) {
-                    reloadingClassLoader.invalidateClasses(
-                            analyzeClasses(compiledFilesToRemove, compiledFilesToUpdate)
-                    );
+                if (newFiles || !compiledFilesToRemove.isEmpty() || !compiledFilesToUpdate.isEmpty()) {
+                    getLog().info("Source changes detected");
+
+                    try {
+                        // Invalidate classes from source files that are gone
+                        reloadingClassLoader.invalidateClasses(analyzeClasses(compiledFilesToRemove));
+                    } catch (MojoExecutionException e) {
+                        getLog().info("Cannot detect removed classes, invalidating all classes");
+                        reloadingClassLoader.invalidateAllClasses();
+                    }
+
+                    // Remove compiled files for source files that are gone
                     removeFiles(compiledFilesToRemove);
+
+                    try {
+                        // Invalidate classes from source files that have changed
+                        reloadingClassLoader.invalidateClasses(analyzeClasses(compiledFilesToUpdate));
+                    } catch (MojoExecutionException e) {
+                        getLog().info("Cannot detect changed classes, invalidating all classes");
+                        reloadingClassLoader.invalidateAllClasses();
+                    }
+
+                    // Recompile the sources
                     recompile();
+
+                    // Refresh the app
                     launcherRunnable.refresh();
+
+                    // Trigger LiveReload
                     if (lrServer != null) {
                         getLog().info("Triggering LiveReload");
                         lrServer.notifyChange("/");
                     }
+
+                    getLog().info("Refresh complete");
                 }
             } catch (Exception e) {
                 Throwable toLog = e.getCause();
@@ -172,29 +213,32 @@ public class WatchMojo extends AbstractExecutableMojo {
             }
         }
 
-        private void analyzeEvents(Set<FileEvent> fileEvents, Set<File> compiledFilesToRemove,
+        private boolean analyzeEvents(Set<FileEvent> fileEvents, Set<File> compiledFilesToRemove,
                 Set<File> compiledFilesToUpdate) throws MojoExecutionException {
+            boolean newFiles = false;
             for (FileEvent fileEvent : fileEvents) {
                 File changedFile = fileEvent.getFile();
                 if (!changedFile.isDirectory()) {
                     for (String compileSourceRoot : compileSourceRoots) {
                         try {
-                            String changedFilePath = changedFile.getCanonicalPath();
+                            String canonicalChangedFile = changedFile.getCanonicalPath();
                             String sourceRootPath = new File(compileSourceRoot).getCanonicalPath();
-                            if (changedFilePath.startsWith(sourceRootPath + File.separator)
-                                    && changedFilePath.endsWith(".java")) {
-                                String compiledFile = changedFilePath.substring(sourceRootPath.length());
-                                compiledFile = compiledFile.replaceAll("\\.java$", ".class");
-                                File fullCompiledFile = new File(getClassesDirectory(), compiledFile);
-                                switch (fileEvent.getKind()) {
-                                    case MODIFY:
-                                        compiledFilesToUpdate.add(fullCompiledFile);
-                                        break;
-                                    case DELETE:
-                                        compiledFilesToRemove.add(fullCompiledFile);
-                                        break;
-                                    default:
-                                        // nothing to do
+                            if (canonicalChangedFile.startsWith(sourceRootPath + File.separator)
+                                    && canonicalChangedFile.endsWith(".java")) {
+                                if (fileEvent.getKind() == FileEvent.Kind.CREATE) {
+                                    if (changedFile.length() > 0) {
+                                        // ignore empty files (not relevant for app refresh)
+                                        getLog().info("NEW: " + canonicalChangedFile);
+                                        newFiles = true;
+                                    }
+                                } else if (fileEvent.getKind() == FileEvent.Kind.MODIFY) {
+                                    getLog().info("MODIFIED: " + canonicalChangedFile);
+                                    compiledFilesToUpdate.add(resolveCompiledFile(sourceRootPath,
+                                            canonicalChangedFile));
+                                } else if (fileEvent.getKind() == FileEvent.Kind.DELETE) {
+                                    getLog().info("DELETED: " + canonicalChangedFile);
+                                    compiledFilesToRemove.add(resolveCompiledFile(sourceRootPath,
+                                            canonicalChangedFile));
                                 }
                             }
                         } catch (IOException e) {
@@ -204,34 +248,38 @@ public class WatchMojo extends AbstractExecutableMojo {
                     }
                 }
             }
+            return newFiles;
+        }
+
+        private File resolveCompiledFile(String sourceRootPath, String changedFilePath) {
+            return new File(getClassesDirectory(), changedFilePath
+                    .substring(sourceRootPath.length())
+                    .replaceAll("\\.java$", ".class"));
         }
 
         private void removeFiles(Set<File> compiledFilesToRemove) throws MojoExecutionException {
             for (File file : compiledFilesToRemove) {
-                if (!file.delete()) {
+                if (file.exists() && !file.delete()) {
                     throw new MojoExecutionException("Unable to remove compiled file " + file.getAbsolutePath());
                 }
             }
         }
 
-        private Set<String> analyzeClasses(Set<File> compiledFilesToRemove, Set<File> compiledFilesToUpdate) {
+        private Set<String> analyzeClasses(Set<File> classFiles) throws MojoExecutionException {
             Set<String> classNamesToInvalidate = new HashSet<>();
-            for (File file : compiledFilesToRemove) {
-                classNamesToInvalidate.addAll(collectClassNames(file));
-            }
-            for (File file : compiledFilesToUpdate) {
+            for (File file : classFiles) {
                 classNamesToInvalidate.addAll(collectClassNames(file));
             }
             return classNamesToInvalidate;
         }
 
-        private Set<String> collectClassNames(File classFile) {
+        private Set<String> collectClassNames(File classFile) throws MojoExecutionException {
             Set<String> classNames = new HashSet<>();
             try (FileInputStream is = new FileInputStream(classFile)) {
                 ClassReader classReader = new ClassReader(is);
                 classReader.accept(new ClassNameCollector(classNames), 0);
             } catch (IOException e) {
-                getLog().warn("Unable to parse class file " + classFile.getAbsolutePath());
+                throw new MojoExecutionException("Unable to analyze class file " + classFile.getAbsolutePath());
             }
             return classNames;
         }
