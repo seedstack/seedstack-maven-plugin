@@ -431,10 +431,12 @@ public class GenerateMojo extends AbstractSeedStackMojo {
     }
 
     private boolean autodetectBasicMode() {
-        String ostype = System.getenv("OSTYPE");
-        if (ostype != null && !ostype.isEmpty()) {
-            // Fancy mode never works under cygwin
-            if (ostype.startsWith("cygwin")) {
+        String osType = System.getenv("OSTYPE");
+        String cygwin = System.getenv("CYGWIN");
+        if (cygwin != null) {
+            return true;
+        } else if (osType != null && !osType.isEmpty()) {
+            if (osType.startsWith("cygwin")) {
                 return true;
             }
         }
