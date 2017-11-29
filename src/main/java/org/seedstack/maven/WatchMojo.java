@@ -56,7 +56,7 @@ import org.seedstack.maven.watcher.FileEvent;
         requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 @Execute(phase = LifecyclePhase.PROCESS_CLASSES)
 public class WatchMojo extends AbstractExecutableMojo {
-    public static final int LIVE_RELOAD_PORT = 35729;
+    private static final int LIVE_RELOAD_PORT = 35729;
     private DirectoryWatcher directoryWatcher;
     private Thread watcherThread;
     private List<String> compileSourceRoots;
@@ -165,9 +165,9 @@ public class WatchMojo extends AbstractExecutableMojo {
                 Set<File> compiledFilesToRemove = new HashSet<>();
                 Set<File> compiledFilesToUpdate = new HashSet<>();
 
-                boolean newFiles = analyzeEvents(fileEvents, compiledFilesToRemove, compiledFilesToUpdate);
+                analyzeEvents(fileEvents, compiledFilesToRemove, compiledFilesToUpdate);
 
-                if (newFiles || !compiledFilesToRemove.isEmpty() || !compiledFilesToUpdate.isEmpty()) {
+                if (!compiledFilesToRemove.isEmpty() || !compiledFilesToUpdate.isEmpty()) {
                     getLog().info("Source changes detected");
 
                     try {
@@ -213,9 +213,8 @@ public class WatchMojo extends AbstractExecutableMojo {
             }
         }
 
-        private boolean analyzeEvents(Set<FileEvent> fileEvents, Set<File> compiledFilesToRemove,
+        private void analyzeEvents(Set<FileEvent> fileEvents, Set<File> compiledFilesToRemove,
                 Set<File> compiledFilesToUpdate) throws MojoExecutionException {
-            boolean newFiles = false;
             for (FileEvent fileEvent : fileEvents) {
                 File changedFile = fileEvent.getFile();
                 if (!changedFile.isDirectory()) {
@@ -226,17 +225,15 @@ public class WatchMojo extends AbstractExecutableMojo {
                             if (canonicalChangedFile.startsWith(sourceRootPath + File.separator)
                                     && canonicalChangedFile.endsWith(".java")) {
                                 if (fileEvent.getKind() == FileEvent.Kind.CREATE) {
-                                    if (changedFile.length() > 0) {
-                                        // ignore empty files (not relevant for app refresh)
-                                        getLog().info("NEW: " + canonicalChangedFile);
-                                        newFiles = true;
-                                    }
+                                    getLog().debug("NEW: " + canonicalChangedFile);
+                                    compiledFilesToUpdate.add(resolveCompiledFile(sourceRootPath,
+                                            canonicalChangedFile));
                                 } else if (fileEvent.getKind() == FileEvent.Kind.MODIFY) {
-                                    getLog().info("MODIFIED: " + canonicalChangedFile);
+                                    getLog().debug("MODIFIED: " + canonicalChangedFile);
                                     compiledFilesToUpdate.add(resolveCompiledFile(sourceRootPath,
                                             canonicalChangedFile));
                                 } else if (fileEvent.getKind() == FileEvent.Kind.DELETE) {
-                                    getLog().info("DELETED: " + canonicalChangedFile);
+                                    getLog().debug("DELETED: " + canonicalChangedFile);
                                     compiledFilesToRemove.add(resolveCompiledFile(sourceRootPath,
                                             canonicalChangedFile));
                                 }
@@ -248,7 +245,6 @@ public class WatchMojo extends AbstractExecutableMojo {
                     }
                 }
             }
-            return newFiles;
         }
 
         private File resolveCompiledFile(String sourceRootPath, String changedFilePath) {
@@ -268,7 +264,9 @@ public class WatchMojo extends AbstractExecutableMojo {
         private Set<String> analyzeClasses(Set<File> classFiles) throws MojoExecutionException {
             Set<String> classNamesToInvalidate = new HashSet<>();
             for (File file : classFiles) {
-                classNamesToInvalidate.addAll(collectClassNames(file));
+                if (file.exists() && file.length() > 0) {
+                    classNamesToInvalidate.addAll(collectClassNames(file));
+                }
             }
             return classNamesToInvalidate;
         }

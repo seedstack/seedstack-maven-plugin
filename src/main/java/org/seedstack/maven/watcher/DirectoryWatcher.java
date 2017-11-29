@@ -131,15 +131,21 @@ public class DirectoryWatcher implements Runnable {
                 File file = path.toFile();
 
                 if (!file.isDirectory()) {
-                    if (event.kind() == ENTRY_CREATE && isReallyCreatedOrModified(file)) {
+                    if (event.kind() == ENTRY_CREATE) {
                         log.debug("New file: " + path);
-                        fileEvents.add(new FileEvent(FileEvent.Kind.CREATE, file));
-                    } else if (event.kind() == ENTRY_MODIFY && isReallyCreatedOrModified(file)) {
+                        if (isReallyCreatedOrModified(file)) {
+                            fileEvents.add(new FileEvent(FileEvent.Kind.CREATE, file));
+                        }
+                    } else if (event.kind() == ENTRY_MODIFY) {
                         log.debug("File modified: " + path);
-                        fileEvents.add(new FileEvent(FileEvent.Kind.MODIFY, file));
-                    } else if (event.kind() == ENTRY_DELETE && isReallyDeleted(file)) {
+                        if (isReallyCreatedOrModified(file)) {
+                            fileEvents.add(new FileEvent(FileEvent.Kind.MODIFY, file));
+                        }
+                    } else if (event.kind() == ENTRY_DELETE) {
                         log.debug("File deleted: " + path);
-                        fileEvents.add(new FileEvent(FileEvent.Kind.DELETE, file));
+                        if (isReallyDeleted(file)) {
+                            fileEvents.add(new FileEvent(FileEvent.Kind.DELETE, file));
+                        }
                     }
                 }
 
