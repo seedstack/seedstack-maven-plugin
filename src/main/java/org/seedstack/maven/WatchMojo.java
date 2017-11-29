@@ -128,7 +128,7 @@ public class WatchMojo extends AbstractExecutableMojo {
     URLClassLoader getClassLoader(final URL[] classPathUrls) {
         reloadingClassLoader = AccessController.doPrivileged(new PrivilegedAction<ReloadingClassLoader>() {
             public ReloadingClassLoader run() {
-                return new ReloadingClassLoader(getLog(), classPathUrls);
+                return new ReloadingClassLoader(getLog(), classPathUrls, compileSourceRoots);
             }
         });
         return reloadingClassLoader;
@@ -188,6 +188,9 @@ public class WatchMojo extends AbstractExecutableMojo {
                         getLog().info("Cannot detect changed classes, invalidating all classes");
                         reloadingClassLoader.invalidateAllClasses();
                     }
+
+                    // Invalidate generated classes
+                    reloadingClassLoader.invalidateClassesFromPackage("org.seedstack.business.__generated");
 
                     // Recompile the sources
                     recompile();
@@ -276,7 +279,7 @@ public class WatchMojo extends AbstractExecutableMojo {
             try (FileInputStream is = new FileInputStream(classFile)) {
                 ClassReader classReader = new ClassReader(is);
                 classReader.accept(new ClassNameCollector(classNames), 0);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 throw new MojoExecutionException("Unable to analyze class file " + classFile.getAbsolutePath());
             }
             return classNames;
