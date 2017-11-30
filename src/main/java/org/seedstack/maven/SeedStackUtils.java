@@ -10,7 +10,6 @@ package org.seedstack.maven;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import org.apache.maven.plugin.MojoExecutionException;
 
 /**
  * SeedStack utils.
@@ -35,11 +34,11 @@ public final class SeedStackUtils {
             }
             return getLauncherMethod.invoke(null);
         } catch (Exception e) {
-            throw new MojoExecutionException("Cannot launch SeedStack application", unwrapException(e));
+            throw unwrapException(e);
         }
     }
 
-    public static Object getToolLauncher(String tool) throws MojoExecutionException {
+    public static Object getToolLauncher(String tool) throws Exception {
         try {
             Method getLauncherMethod;
             try {
@@ -51,7 +50,7 @@ public final class SeedStackUtils {
             }
             return getLauncherMethod.invoke(null, tool);
         } catch (Exception e) {
-            throw new MojoExecutionException("Cannot launch SeedStack tool", unwrapException(e));
+            throw unwrapException(e);
         }
     }
 
@@ -60,8 +59,7 @@ public final class SeedStackUtils {
             Method launchMethod = seedLauncher.getClass().getMethod("launch", String[].class);
             launchMethod.invoke(seedLauncher, new Object[]{args});
         } catch (Exception e) {
-            throw new MojoExecutionException("Cannot launch SeedStack application", unwrapException(e));
-
+            throw unwrapException(e);
         }
     }
 
@@ -70,7 +68,7 @@ public final class SeedStackUtils {
             Method shutdownMethod = seedLauncher.getClass().getMethod("shutdown");
             shutdownMethod.invoke(seedLauncher);
         } catch (Exception e) {
-            throw new MojoExecutionException("Cannot shutdown SeedStack application", unwrapException(e));
+            throw unwrapException(e);
         }
     }
 
@@ -79,22 +77,23 @@ public final class SeedStackUtils {
         try {
             refreshMethod = seedLauncher.getClass().getMethod("refresh");
         } catch (NoSuchMethodException e) {
-            throw new MojoExecutionException("Application refresh is not supported before Seed 3.4.0", e);
+            throw new RuntimeException("Application refresh is not supported before Seed 3.4.0", e);
         }
         try {
             refreshMethod.invoke(seedLauncher);
         } catch (Exception e) {
-            throw new MojoExecutionException("Unable to refresh SeedStack application", unwrapException(e));
+            throw unwrapException(e);
         }
     }
 
-    private static Throwable unwrapException(Exception e) {
-        Throwable t;
-        if (e instanceof InvocationTargetException) {
-            t = ((InvocationTargetException) e).getTargetException();
+    private static Exception unwrapException(Exception e) {
+        Exception unwrapped;
+        if (e instanceof InvocationTargetException
+                && ((InvocationTargetException) e).getTargetException() instanceof Exception) {
+            unwrapped = (Exception) ((InvocationTargetException) e).getTargetException();
         } else {
-            t = e;
+            unwrapped = e;
         }
-        return t;
+        return unwrapped;
     }
 }

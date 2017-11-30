@@ -23,7 +23,7 @@
     <packaging>maven-plugin</packaging>
 
     <properties>
-        <maven.version>3.1</maven.version>
+        <maven.version>3.3</maven.version>
         <plexus-component.version>1.6</plexus-component.version>
         <maven.compiler.source>1.7</maven.compiler.source>
         <maven.compiler.target>1.7</maven.compiler.target>
@@ -80,7 +80,8 @@
                             <licenseMerge>BSD|BSD 3-Clause License</licenseMerge>
                             <licenseMerge>BSD|BSD style modified by Coverity</licenseMerge>
                             <licenseMerge>BSD|The BSD License</licenseMerge>
-                            <licenseMerge>CDDL 1.0|COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0</licenseMerge>
+                            <licenseMerge>CDDL 1.0|COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0
+                            </licenseMerge>
                             <licenseMerge>CPL 1.0|Common Public License Version 1.0</licenseMerge>
                             <licenseMerge>EPL 1.0|Eclipse Public License, Version 1.0</licenseMerge>
                             <licenseMerge>EPL 1.0|Eclipse Public License - Version 1.0</licenseMerge>
@@ -93,7 +94,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-plugin-plugin</artifactId>
-                    <version>${maven.version}</version>
+                    <version>3.5</version>
                     <configuration>
                         <skipErrorNoDescriptorsFound>true</skipErrorNoDescriptorsFound>
                     </configuration>
@@ -146,6 +147,16 @@
                 <artifactId>jline</artifactId>
                 <version>2.14.5</version>
             </dependency>
+            <dependency>
+                <groupId>commons-collections</groupId>
+                <artifactId>commons-collections</artifactId>
+                <version>3.2.2</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>18.0</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -184,7 +195,7 @@
         <dependency>
             <groupId>org.eclipse.aether</groupId>
             <artifactId>aether-util</artifactId>
-            <version>0.9.0.M2</version>
+            <version>1.0.2.v20150114</version>
         </dependency>
         <dependency>
             <groupId>org.twdata.maven</groupId>
@@ -205,25 +216,25 @@
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-core</artifactId>
-            <version>${maven.version}.0</version>
+            <version>${maven.version}.9</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-model</artifactId>
-            <version>${maven.version}.0</version>
+            <version>${maven.version}.9</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-plugin-api</artifactId>
-            <version>${maven.version}.0</version>
+            <version>${maven.version}.9</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-artifact</artifactId>
-            <version>${maven.version}.0</version>
+            <version>${maven.version}.9</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -252,9 +263,9 @@
             <version>${jackson.version}</version>
         </dependency>
         <dependency>
-            <groupId>asm</groupId>
+            <groupId>org.ow2.asm</groupId>
             <artifactId>asm</artifactId>
-            <version>3.3.1</version>
+            <version>6.0</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>

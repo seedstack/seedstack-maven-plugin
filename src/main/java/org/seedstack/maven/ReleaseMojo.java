@@ -5,30 +5,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 package org.seedstack.maven;
-
-import org.apache.maven.execution.MavenSession;
-import org.apache.maven.model.Dependency;
-import org.apache.maven.model.Profile;
-import org.apache.maven.plugin.AbstractMojo;
-import org.apache.maven.plugin.BuildPluginManager;
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
-import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.project.DefaultProjectBuildingRequest;
-import org.apache.maven.project.MavenProject;
-import org.apache.maven.project.ProjectBuilder;
-import org.apache.maven.project.ProjectBuildingException;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 
 import static org.twdata.maven.mojoexecutor.MojoExecutor.artifactId;
 import static org.twdata.maven.mojoexecutor.MojoExecutor.configuration;
@@ -39,6 +17,28 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.groupId;
 import static org.twdata.maven.mojoexecutor.MojoExecutor.plugin;
 import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Profile;
+import org.apache.maven.plugin.BuildPluginManager;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.Component;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.project.DefaultProjectBuildingRequest;
+import org.apache.maven.project.MavenProject;
+import org.apache.maven.project.ProjectBuilder;
+import org.apache.maven.project.ProjectBuildingException;
+
 /**
  * Release the project simply by stripping the -SNAPSHOT part of the version.
  * Useful in continuous delivery pipelines.
@@ -47,49 +47,50 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
  */
 @Mojo(name = "release", requiresProject = true, threadSafe = false, aggregator = true)
 public class ReleaseMojo extends AbstractSeedStackMojo {
-    public static final String SNAPSHOT_SUFFIX = "-SNAPSHOT";
-
-    @Component
-    private MavenProject executionMavenProject;
-
-    @Component
+    private static final String SNAPSHOT_SUFFIX = "-SNAPSHOT";
+    @Parameter(defaultValue = "${project}", readonly = true)
+    private MavenProject mavenProject;
+    @Parameter(defaultValue = "${session}", readonly = true)
     private MavenSession mavenSession;
-
     @Component
     private BuildPluginManager buildPluginManager;
-
     @Component
     private ProjectBuilder projectBuilder;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        String currentVersion = executionMavenProject.getVersion();
+        String currentVersion = mavenProject.getVersion();
 
-        if (isProjectDirty(getReactorModules("", executionMavenProject))) {
-            throw new MojoFailureException("Cannot continue, a POM transformation is already in progress, commit and revert it before executing the release goal");
+        if (isProjectDirty(getReactorModules("", mavenProject))) {
+            throw new MojoFailureException(
+                    "Cannot continue, a POM transformation is already in progress, commit and revert it before " +
+                            "executing the release goal");
         }
 
-        if (!executionMavenProject.equals(getLocalRoot(executionMavenProject))) {
-            throw new MojoFailureException("Cannot continue, release goal must be executed from the local project root");
+        if (!mavenProject.equals(getLocalRoot(mavenProject))) {
+            throw new MojoFailureException("Cannot continue, release goal must be executed from the local project " +
+                    "root");
         }
 
         if (!currentVersion.endsWith(SNAPSHOT_SUFFIX)) {
             throw new MojoFailureException("Cannot continue, project version is not a SNAPSHOT");
         }
 
-        if (executionMavenProject.hasParent() && executionMavenProject.getParent().getVersion().endsWith(SNAPSHOT_SUFFIX)) {
+        if (mavenProject.hasParent() && mavenProject.getParent()
+                .getVersion()
+                .endsWith(SNAPSHOT_SUFFIX)) {
             throw new MojoFailureException("Cannot continue, parent project is still a SNAPSHOT");
         }
 
         String newVersion = currentVersion.substring(0, currentVersion.length() - SNAPSHOT_SUFFIX.length());
         getLog().info("SNAPSHOT version found, setting release version to " + newVersion);
-        executionMavenProject.getProperties().setProperty("newVersion", newVersion);
-        executeVersionsPlugin("set", executionMavenProject);
+        mavenProject.getProperties().setProperty("newVersion", newVersion);
+        executeVersionsPlugin("set", mavenProject);
 
         boolean shouldRevert = false;
         List<MavenProject> transformedModules = new ArrayList<>();
-        transformedModules.add(executionMavenProject);
-        transformedModules.addAll(getReactorModules("", executionMavenProject).values());
+        transformedModules.add(mavenProject);
+        transformedModules.addAll(getReactorModules("", mavenProject).values());
         getLog().info("Checking transformed modules");
         for (MavenProject transformedModule : transformedModules) {
             try {
@@ -127,7 +128,7 @@ public class ReleaseMojo extends AbstractSeedStackMojo {
     }
 
     private void checkModule(MavenProject mavenProject) throws MojoFailureException {
-        Map<String, Dependency> snapshotDependencies = new HashMap<String, Dependency>();
+        Map<String, Dependency> snapshotDependencies = new HashMap<>();
         for (Dependency dependency : mavenProject.getDependencies()) {
             if (dependency.getVersion().endsWith(SNAPSHOT_SUFFIX)) {
                 snapshotDependencies.put(mavenProject.getArtifactId(), dependency);
@@ -135,9 +136,14 @@ public class ReleaseMojo extends AbstractSeedStackMojo {
         }
 
         if (!snapshotDependencies.isEmpty()) {
-            StringBuilder sb = new StringBuilder("Cannot continue, there are still SNAPSHOT dependencies in the project:\n");
+            StringBuilder sb = new StringBuilder(
+                    "Cannot continue, there are still SNAPSHOT dependencies in the project:\n");
             for (Map.Entry<String, Dependency> dependencyEntry : snapshotDependencies.entrySet()) {
-                sb.append("\t* ").append(dependencyEntry.getKey()).append(": ").append(dependencyEntry.getValue().getManagementKey()).append("\n");
+                sb.append("\t* ")
+                        .append(dependencyEntry.getKey())
+                        .append(": ")
+                        .append(dependencyEntry.getValue().getManagementKey())
+                        .append("\n");
             }
 
             throw new MojoFailureException(sb.toString());
@@ -180,8 +186,8 @@ public class ReleaseMojo extends AbstractSeedStackMojo {
             path += '/';
         }
 
-        Map<String, MavenProject> result = new LinkedHashMap<String, MavenProject>();
-        Map<String, MavenProject> childResults = new LinkedHashMap<String, MavenProject>();
+        Map<String, MavenProject> result = new LinkedHashMap<>();
+        Map<String, MavenProject> childResults = new LinkedHashMap<>();
 
         Set<String> childModules = getChildModules(project);
         for (String moduleName : childModules) {
@@ -211,9 +217,8 @@ public class ReleaseMojo extends AbstractSeedStackMojo {
         return result;
     }
 
-
     private Set<String> getChildModules(MavenProject mavenProject) {
-        Set<String> childModules = new TreeSet<String>();
+        Set<String> childModules = new TreeSet<>();
         childModules.addAll(mavenProject.getModules());
         for (Profile profile : mavenProject.getModel().getProfiles()) {
             childModules.addAll(profile.getModules());
@@ -246,7 +251,7 @@ public class ReleaseMojo extends AbstractSeedStackMojo {
     private MavenProject buildProject(File moduleProjectFile) throws ProjectBuildingException {
         DefaultProjectBuildingRequest request = new DefaultProjectBuildingRequest();
         request.setSystemProperties(System.getProperties());
-        request.setRepositorySession(executionMavenProject.getProjectBuildingRequest().getRepositorySession());
+        request.setRepositorySession(mavenProject.getProjectBuildingRequest().getRepositorySession());
         return projectBuilder.build(moduleProjectFile, request).getProject();
     }
 }

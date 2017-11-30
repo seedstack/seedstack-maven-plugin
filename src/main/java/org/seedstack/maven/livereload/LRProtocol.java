@@ -19,10 +19,10 @@ import org.json.simple.JSONValue;
  */
 class LRProtocol {
     String hello() {
-        LinkedList<String> protocols = new LinkedList<String>();
+        LinkedList<String> protocols = new LinkedList<>();
         protocols.add("http://livereload.com/protocols/official-7");
 
-        LinkedHashMap<String, Object> obj = new LinkedHashMap<String, Object>();
+        LinkedHashMap<String, Object> obj = new LinkedHashMap<>();
         obj.put("command", "hello");
         obj.put("protocols", protocols);
         obj.put("serverName", "livereload-jvm");
@@ -30,14 +30,14 @@ class LRProtocol {
     }
 
     String alert(String msg) throws Exception {
-        LinkedHashMap<String, Object> obj = new LinkedHashMap<String, Object>();
+        LinkedHashMap<String, Object> obj = new LinkedHashMap<>();
         obj.put("command", "alert");
         obj.put("message", msg);
         return JSONValue.toJSONString(obj);
     }
 
     String reload(String path) throws Exception {
-        LinkedHashMap<String, Object> obj = new LinkedHashMap<String, Object>();
+        LinkedHashMap<String, Object> obj = new LinkedHashMap<>();
         obj.put("command", "reload");
         obj.put("path", path);
         obj.put("liveCSS", true);

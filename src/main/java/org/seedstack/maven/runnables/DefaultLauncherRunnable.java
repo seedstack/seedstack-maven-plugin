@@ -60,16 +60,18 @@ public class DefaultLauncherRunnable implements Runnable {
 
     @SuppressFBWarnings(value = {"UW_UNCOND_WAIT", "WA_NOT_IN_LOOP"}, justification = "Cannot know when the "
             + "application is refreshed")
-    public void refresh() {
+    public void refresh() throws Exception {
+        final Exception[] refreshException = new Exception[]{null};
         if (seedLauncher != null) {
             new Thread(threadGroup, new Runnable() {
                 @Override
                 public void run() {
                     Thread.currentThread().setContextClassLoader(classLoader);
+
                     try {
                         SeedStackUtils.refresh(seedLauncher);
                     } catch (Exception e) {
-                        log.error("Unable to refresh SeedStack application", e);
+                        refreshException[0] = e;
                     }
 
                     // Notify end of refresh
@@ -87,6 +89,9 @@ public class DefaultLauncherRunnable implements Runnable {
             } catch (InterruptedException e) {
                 log.warn("Failed to wait until refresh is complete");
             }
+        }
+        if (refreshException[0] != null) {
+            throw refreshException[0];
         }
     }
 }

@@ -39,7 +39,7 @@ public class ReloadingClassLoader extends URLClassLoader {
 
     @Override
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-        if (isGenerated(name) || isClassInSourceRoots(name)) {
+        if (isClassInSourceRoots(name)) {
             DisposableClassLoader disposableClassLoader;
             synchronized (classLoaders) {
                 disposableClassLoader = classLoaders.get(name);
@@ -51,10 +51,6 @@ public class ReloadingClassLoader extends URLClassLoader {
         } else {
             return super.loadClass(name, resolve);
         }
-    }
-
-    private boolean isGenerated(String name) {
-        return name.startsWith("org.seedstack.__generated.");
     }
 
     private boolean isClassInSourceRoots(String name) {

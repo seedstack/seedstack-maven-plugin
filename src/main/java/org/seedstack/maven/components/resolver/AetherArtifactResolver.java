@@ -94,7 +94,7 @@ public class AetherArtifactResolver implements ArtifactResolver {
             throw new RuntimeException("Unable to resolve project artifacts");
         }
 
-        Set<Artifact> artifacts = new HashSet<Artifact>();
+        Set<Artifact> artifacts = new HashSet<>();
         for (org.eclipse.aether.graph.Dependency dependency : result.getDependencies()) {
             artifacts.add(dependency.getArtifact());
         }

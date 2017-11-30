@@ -18,7 +18,7 @@ import org.eclipse.jetty.websocket.WebSocketHandler;
  * Modified from: https://github.com/davidB/livereload-jvm
  */
 class LRWebSocketHandler extends WebSocketHandler {
-    private final ConcurrentLinkedQueue<LRWebSocket> _broadcast = new ConcurrentLinkedQueue<LRWebSocket>();
+    private final ConcurrentLinkedQueue<LRWebSocket> _broadcast = new ConcurrentLinkedQueue<>();
     private final LRProtocol _protocol = new LRProtocol();
 
     @Override

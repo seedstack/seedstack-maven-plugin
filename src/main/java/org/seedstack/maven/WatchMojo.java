@@ -36,12 +36,9 @@ import org.apache.maven.plugins.annotations.Execute;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.FieldVisitor;
-import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 import org.seedstack.maven.classloader.ReloadingClassLoader;
 import org.seedstack.maven.livereload.LRServer;
 import org.seedstack.maven.runnables.DefaultLauncherRunnable;
@@ -112,7 +109,8 @@ public class WatchMojo extends AbstractExecutableMojo {
         }
 
         // Start watching sources
-        this.watcherThread.start();
+        watcherThread.start();
+
         waitForShutdown();
 
         if (lrServer != null) {
@@ -135,6 +133,9 @@ public class WatchMojo extends AbstractExecutableMojo {
     }
 
     private class WatchFileChangeListener implements FileChangeListener {
+        private static final String COMPILATION_FAILURE_EXCEPTION = "org.apache.maven.plugin.compiler" +
+                ".CompilationFailureException";
+
         private final Semaphore semaphore = new Semaphore(1);
         private final ArrayBlockingQueue<FileEvent> pending = new ArrayBlockingQueue<>(10000);
 
@@ -173,8 +174,8 @@ public class WatchMojo extends AbstractExecutableMojo {
                     try {
                         // Invalidate classes from source files that are gone
                         reloadingClassLoader.invalidateClasses(analyzeClasses(compiledFilesToRemove));
-                    } catch (MojoExecutionException e) {
-                        getLog().info("Cannot detect removed classes, invalidating all classes");
+                    } catch (RefreshException e) {
+                        getLog().info("Cannot detect removed classes, invalidating all classes", e);
                         reloadingClassLoader.invalidateAllClasses();
                     }
 
@@ -184,8 +185,8 @@ public class WatchMojo extends AbstractExecutableMojo {
                     try {
                         // Invalidate classes from source files that have changed
                         reloadingClassLoader.invalidateClasses(analyzeClasses(compiledFilesToUpdate));
-                    } catch (MojoExecutionException e) {
-                        getLog().info("Cannot detect changed classes, invalidating all classes");
+                    } catch (RefreshException e) {
+                        getLog().info("Cannot detect changed classes, invalidating all classes", e);
                         reloadingClassLoader.invalidateAllClasses();
                     }
 
@@ -208,8 +209,7 @@ public class WatchMojo extends AbstractExecutableMojo {
                 }
             } catch (Exception e) {
                 Throwable toLog = e.getCause();
-                if (toLog == null || !toLog.getClass().getName()
-                        .equals("org.apache.maven.plugin.compiler.CompilationFailureException")) {
+                if (toLog == null || !toLog.getClass().getName().equals(COMPILATION_FAILURE_EXCEPTION)) {
                     toLog = e;
                 }
                 getLog().warn("An error occurred during application refresh, ignoring changes", toLog);
@@ -256,15 +256,15 @@ public class WatchMojo extends AbstractExecutableMojo {
                     .replaceAll("\\.java$", ".class"));
         }
 
-        private void removeFiles(Set<File> compiledFilesToRemove) throws MojoExecutionException {
+        private void removeFiles(Set<File> compiledFilesToRemove) throws RefreshException {
             for (File file : compiledFilesToRemove) {
                 if (file.exists() && !file.delete()) {
-                    throw new MojoExecutionException("Unable to remove compiled file " + file.getAbsolutePath());
+                    throw new RefreshException("Unable to remove compiled file " + file.getAbsolutePath());
                 }
             }
         }
 
-        private Set<String> analyzeClasses(Set<File> classFiles) throws MojoExecutionException {
+        private Set<String> analyzeClasses(Set<File> classFiles) throws RefreshException {
             Set<String> classNamesToInvalidate = new HashSet<>();
             for (File file : classFiles) {
                 if (file.exists() && file.length() > 0) {
@@ -274,13 +274,13 @@ public class WatchMojo extends AbstractExecutableMojo {
             return classNamesToInvalidate;
         }
 
-        private Set<String> collectClassNames(File classFile) throws MojoExecutionException {
+        private Set<String> collectClassNames(File classFile) throws RefreshException {
             Set<String> classNames = new HashSet<>();
             try (FileInputStream is = new FileInputStream(classFile)) {
                 ClassReader classReader = new ClassReader(is);
                 classReader.accept(new ClassNameCollector(classNames), 0);
             } catch (Exception e) {
-                throw new MojoExecutionException("Unable to analyze class file " + classFile.getAbsolutePath());
+                throw new RefreshException("Unable to analyze class file " + classFile.getAbsolutePath(), e);
             }
             return classNames;
         }
@@ -294,10 +294,11 @@ public class WatchMojo extends AbstractExecutableMojo {
             );
         }
 
-        private class ClassNameCollector implements ClassVisitor {
+        private class ClassNameCollector extends ClassVisitor {
             private final Set<String> classNames;
 
             ClassNameCollector(Set<String> classNames) {
+                super(Opcodes.ASM6);
                 this.classNames = classNames;
             }
 
@@ -306,42 +307,15 @@ public class WatchMojo extends AbstractExecutableMojo {
                 classNames.add(name);
             }
 
-            @Override
-            public void visitSource(String s, String s1) {
-            }
-
-            @Override
             public void visitOuterClass(String owner, String name, String desc) {
                 classNames.add(name);
-            }
-
-            @Override
-            public AnnotationVisitor visitAnnotation(String s, boolean b) {
-                return null;
-            }
-
-            @Override
-            public void visitAttribute(Attribute attribute) {
             }
 
             @Override
             public void visitInnerClass(String name, String outerName, String innerName, int access) {
                 classNames.add(name);
             }
-
-            @Override
-            public FieldVisitor visitField(int i, String s, String s1, String s2, Object o) {
-                return null;
-            }
-
-            @Override
-            public MethodVisitor visitMethod(int i, String s, String s1, String s2, String[] strings) {
-                return null;
-            }
-
-            @Override
-            public void visitEnd() {
-            }
         }
     }
+
 }
