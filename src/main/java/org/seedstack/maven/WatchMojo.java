@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Semaphore;
+import org.apache.maven.model.Resource;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Execute;
@@ -54,8 +55,10 @@ import org.seedstack.maven.watcher.FileEvent;
 @Execute(phase = LifecyclePhase.PROCESS_CLASSES)
 public class WatchMojo extends AbstractExecutableMojo {
     private static final int LIVE_RELOAD_PORT = 35729;
-    private DirectoryWatcher directoryWatcher;
-    private Thread watcherThread;
+    private DirectoryWatcher sourceWatcher;
+    private DirectoryWatcher resourceWatcher;
+    private Thread sourceWatcherThread;
+    private Thread resourceWatcherThread;
     private List<String> compileSourceRoots;
     private ReloadingClassLoader reloadingClassLoader;
     private DefaultLauncherRunnable launcherRunnable;
@@ -64,8 +67,10 @@ public class WatchMojo extends AbstractExecutableMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         this.compileSourceRoots = Collections.unmodifiableList(getProject().getCompileSourceRoots());
+
         try {
-            this.directoryWatcher = new DirectoryWatcher(getLog(), new WatchFileChangeListener());
+            this.sourceWatcher = new DirectoryWatcher(getLog(), new SourceChangeListener());
+            this.resourceWatcher = new DirectoryWatcher(getLog(), new ResourceChangeListener());
         } catch (IOException e) {
             throw new MojoExecutionException("Unable to create directory watcher", e);
         }
@@ -75,31 +80,63 @@ public class WatchMojo extends AbstractExecutableMojo {
             if (file.isDirectory()) {
                 getLog().info("Will watch source directory " + file.getPath());
                 try {
-                    this.directoryWatcher.watchRecursively(file.toPath());
+                    this.sourceWatcher.watchRecursively(file.toPath());
                 } catch (IOException e) {
-                    throw new MojoExecutionException("Unable to watch directory " + file.getAbsolutePath(), e);
+                    throw new MojoExecutionException("Unable to watch source directory " + file.getAbsolutePath(), e);
                 }
             }
         }
 
-        this.watcherThread = new Thread(this.directoryWatcher, "watcher");
+        for (Resource resource : getProject().getResources()) {
+            File file = new File(resource.getDirectory());
+            if (file.isDirectory()) {
+                getLog().info("Will watch resource directory " + file.getPath());
+                try {
+                    this.resourceWatcher.watchRecursively(file.toPath());
+                } catch (IOException e) {
+                    throw new MojoExecutionException("Unable to watch resource directory "
+                            + file.getAbsolutePath(), e);
+                }
+            }
+        }
+
+        this.sourceWatcherThread = new Thread(this.sourceWatcher, "source-watcher");
+        this.resourceWatcherThread = new Thread(this.resourceWatcher, "resource-watcher");
+        System.setProperty("seedstack.config.config.watchPeriod", "1");
+
         this.launcherRunnable = new DefaultLauncherRunnable(getArgs(), getMonitor(), getLog());
         execute(launcherRunnable, false);
 
-        Runtime.getRuntime().addShutdownHook(new Thread("watcher") {
+        Runtime.getRuntime().addShutdownHook(new Thread("watch") {
             @Override
             public void run() {
-                directoryWatcher.stop();
-                watcherThread.interrupt();
+                if (lrServer != null) {
+                    try {
+                        lrServer.stop();
+                    } catch (Exception e) {
+                        getLog().error("Unable to stop LiveReload server", e);
+                    }
+                }
+
+                sourceWatcher.stop();
+                sourceWatcherThread.interrupt();
                 try {
-                    watcherThread.join(1000);
+                    sourceWatcherThread.join(1000);
+                } catch (InterruptedException e) {
+                    // ignore
+                }
+
+                resourceWatcher.stop();
+                resourceWatcherThread.interrupt();
+                try {
+                    resourceWatcherThread.join(1000);
                 } catch (InterruptedException e) {
                     // ignore
                 }
             }
         });
 
-        // Start live reload server
+        // Start LiveReload server
         try {
             getLog().info("Starting LiveReload server on port " + LIVE_RELOAD_PORT);
             lrServer = new LRServer(LIVE_RELOAD_PORT);
@@ -108,18 +145,12 @@ public class WatchMojo extends AbstractExecutableMojo {
             getLog().error("Unable to start LiveReload server", e);
         }
 
-        // Start watching sources
-        watcherThread.start();
+        // Start watching sources and resources
+        sourceWatcherThread.start();
+        resourceWatcherThread.start();
 
+        // Wait for the app to end
         waitForShutdown();
-
-        if (lrServer != null) {
-            try {
-                lrServer.stop();
-            } catch (Exception e) {
-                getLog().error("Unable to stop LiveReload server", e);
-            }
-        }
     }
 
     @Override
@@ -132,7 +163,48 @@ public class WatchMojo extends AbstractExecutableMojo {
         return reloadingClassLoader;
     }
 
-    private class WatchFileChangeListener implements FileChangeListener {
+    private class ResourceChangeListener implements FileChangeListener {
+        @Override
+        public void onChange(Set<FileEvent> fileEvents) {
+            getLog().info("Resource changes detected");
+
+            for (FileEvent fileEvent : fileEvents) {
+                if (fileEvent.getKind() == FileEvent.Kind.CREATE) {
+                    getLog().debug("NEW: " + fileEvent.getFile().getPath());
+                } else if (fileEvent.getKind() == FileEvent.Kind.MODIFY) {
+                    getLog().debug("MODIFIED: " + fileEvent.getFile().getPath());
+                } else if (fileEvent.getKind() == FileEvent.Kind.DELETE) {
+                    getLog().debug("DELETED: " + fileEvent.getFile().getPath());
+                }
+
+                if (isConfigFile(fileEvent.getFile())) {
+                    getLog().info("A configuration file has changed, waiting for the application to notice the change");
+                    // Wait for the application to notice the change
+                    try {
+                        Thread.sleep(2000);
+                    } catch (InterruptedException e) {
+                        // ignore
+                    }
+                    break;
+                }
+            }
+
+            triggerLiveReload();
+        }
+
+        private boolean isConfigFile(File file) {
+            String fileName = file.getName();
+            return fileName.equals("application.yaml")
+                    || fileName.equals("application.override.yaml")
+                    || fileName.equals("application.json")
+                    || fileName.equals("application.override.json")
+                    || fileName.equals("application.properties")
+                    || fileName.equals("application.override.properties")
+                    || file.getParentFile().getPath().endsWith("META-INF" + File.separator + "configuration");
+        }
+    }
+
+    private class SourceChangeListener implements FileChangeListener {
         private static final String COMPILATION_FAILURE_EXCEPTION = "org.apache.maven.plugin.compiler" +
                 ".CompilationFailureException";
 
@@ -200,10 +272,7 @@ public class WatchMojo extends AbstractExecutableMojo {
                     launcherRunnable.refresh();
 
                     // Trigger LiveReload
-                    if (lrServer != null) {
-                        getLog().info("Triggering LiveReload");
-                        lrServer.notifyChange("/");
-                    }
+                    triggerLiveReload();
 
                     getLog().info("Refresh complete");
                 }
@@ -228,15 +297,15 @@ public class WatchMojo extends AbstractExecutableMojo {
                             if (canonicalChangedFile.startsWith(sourceRootPath + File.separator)
                                     && canonicalChangedFile.endsWith(".java")) {
                                 if (fileEvent.getKind() == FileEvent.Kind.CREATE) {
-                                    getLog().debug("NEW: " + canonicalChangedFile);
+                                    getLog().debug("NEW: " + changedFile.getPath());
                                     compiledFilesToUpdate.add(resolveCompiledFile(sourceRootPath,
                                             canonicalChangedFile));
                                 } else if (fileEvent.getKind() == FileEvent.Kind.MODIFY) {
-                                    getLog().debug("MODIFIED: " + canonicalChangedFile);
+                                    getLog().debug("MODIFIED: " + changedFile.getPath());
                                     compiledFilesToUpdate.add(resolveCompiledFile(sourceRootPath,
                                             canonicalChangedFile));
                                 } else if (fileEvent.getKind() == FileEvent.Kind.DELETE) {
-                                    getLog().debug("DELETED: " + canonicalChangedFile);
+                                    getLog().debug("DELETED: " + changedFile.getPath());
                                     compiledFilesToRemove.add(resolveCompiledFile(sourceRootPath,
                                             canonicalChangedFile));
                                 }
@@ -318,4 +387,14 @@ public class WatchMojo extends AbstractExecutableMojo {
         }
     }
 
+    private void triggerLiveReload() {
+        if (lrServer != null) {
+            getLog().info("Triggering LiveReload");
+            try {
+                lrServer.notifyChange("/");
+            } catch (Exception e) {
+                getLog().warn("Error triggering LiveReload", e);
+            }
+        }
+    }
 }

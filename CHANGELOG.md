@@ -1,3 +1,7 @@
+# Version 2.7.1 (2017-12-15)
+
+* [new] In watch goal, trigger a LiveReload (without app refresh) when a resource change. 
+
 # Version 2.7.0 (2017-11-31)
 
 * [new] Add watch goal which automatically refreshes the application when a source file change.
