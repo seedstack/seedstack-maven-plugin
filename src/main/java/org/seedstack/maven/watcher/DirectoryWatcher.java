@@ -14,7 +14,6 @@ import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
 import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 
-import com.sun.nio.file.SensitivityWatchEventModifier;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -54,10 +53,12 @@ public class DirectoryWatcher implements Runnable {
         this.keys = new HashMap<>();
     }
 
+    @SuppressWarnings("unchecked")
     private WatchEvent.Modifier determineModifier() {
         try {
-            Class.forName("com.sun.nio.file.SensitivityWatchEventModifier");
-            return SensitivityWatchEventModifier.HIGH;
+            return (WatchEvent.Modifier) Enum.valueOf(
+                    (Class<Enum>) Class.forName("com.sun.nio.file.SensitivityWatchEventModifier"),
+                    "HIGH");
         } catch (ClassNotFoundException e) {
             return null;
         }

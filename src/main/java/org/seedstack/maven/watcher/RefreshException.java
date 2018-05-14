@@ -6,9 +6,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-package org.seedstack.maven;
+package org.seedstack.maven.watcher;
 
-class RefreshException extends Exception {
+public class RefreshException extends Exception {
     public RefreshException() {
     }
 

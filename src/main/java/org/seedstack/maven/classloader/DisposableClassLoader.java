@@ -5,60 +5,43 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 package org.seedstack.maven.classloader;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.security.CodeSigner;
-import java.security.CodeSource;
-import java.security.SecureClassLoader;
-import sun.misc.Resource;
+import java.net.URL;
+import java.net.URLClassLoader;
 
-class DisposableClassLoader extends SecureClassLoader {
+class DisposableClassLoader extends URLClassLoader {
     private final ReloadingClassLoader reloadingClassLoader;
-    private final Resource res;
     private final String name;
 
-    DisposableClassLoader(ReloadingClassLoader reloadingClassLoader, String name, Resource res) {
+    DisposableClassLoader(ReloadingClassLoader reloadingClassLoader, String name, URL[] urLs) {
+        super(urLs, null);
         this.reloadingClassLoader = reloadingClassLoader;
         this.name = name;
-        this.res = res;
     }
 
     @Override
     public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         if (this.name.equals(name)) {
+            // Only load the class specific to this classloader
             synchronized (getClassLoadingLock(name)) {
                 // First, check if the class has already been loaded
                 Class<?> c = findLoadedClass(name);
+
                 if (c == null) {
-                    try {
-                        ByteBuffer byteBuffer = res.getByteBuffer();
-                        if (byteBuffer != null) {
-                            // Use (direct) ByteBuffer:
-                            CodeSigner[] signers = res.getCodeSigners();
-                            CodeSource cs = new CodeSource(res.getURL(), signers);
-                            c = defineClass(name, byteBuffer, cs);
-                        } else {
-                            byte[] b = res.getBytes();
-                            // must read certificates AFTER reading bytes.
-                            CodeSigner[] signers = res.getCodeSigners();
-                            CodeSource cs = new CodeSource(res.getURL(), signers);
-                            c = defineClass(name, b, 0, b.length, cs);
-                        }
-                    } catch (IOException e) {
-                        throw new ClassNotFoundException(name, e);
-                    }
+                    // If not, directly load it (no delegation to parent)
+                    c = findClass(name);
                     if (resolve) {
                         resolveClass(c);
                     }
                 }
+
                 return c;
             }
         } else {
+            // Otherwise delegate back to reloading classloader
             return reloadingClassLoader.loadClass(name, resolve);
         }
     }
-
-
 }

@@ -1,6 +1,8 @@
-# Version 2.7.1 (2017-12-15)
+# Version 2.7.1 (2018-05-16)
 
-* [new] In watch goal, trigger a LiveReload (without app refresh) when a resource change. 
+* [new] In watch goal, trigger a LiveReload (without app refresh) when a resource changes.
+* [chg] Java 9 compatibility: avoid using JDK internal classes for hot-reloading.
+* [fix] More reliable check for Cygwin environment. 
 
 # Version 2.7.0 (2017-11-31)
 

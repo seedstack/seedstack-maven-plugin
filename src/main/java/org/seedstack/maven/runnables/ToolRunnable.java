@@ -9,20 +9,16 @@
 package org.seedstack.maven.runnables;
 
 import java.util.Arrays;
-import org.apache.maven.plugin.logging.Log;
+import org.seedstack.maven.Context;
 import org.seedstack.maven.SeedStackUtils;
 
-public class ToolLauncherRunnable implements Runnable {
+public class ToolRunnable implements Runnable {
     private final String tool;
-    private final String[] args;
-    private final Object monitor;
-    private final Log log;
+    private final Context context;
 
-    public ToolLauncherRunnable(String tool, String[] args, Object monitor, Log log) {
+    public ToolRunnable(String tool, Context context) {
         this.tool = tool;
-        this.args = args == null ? null : args.clone();
-        this.monitor = monitor;
-        this.log = log;
+        this.context = context;
     }
 
     public void run() {
@@ -38,14 +34,13 @@ public class ToolLauncherRunnable implements Runnable {
                     }
                 }
             });
-            log.info("Launching Seed tool " + tool + " with arguments " + Arrays.toString(args));
+            String[] args = context.getArgs();
+            context.getLog().info("Launching Seed tool " + tool + " with arguments " + Arrays.toString(args));
             SeedStackUtils.launch(toolLauncher, args);
         } catch (Exception e) {
             Thread.currentThread().getThreadGroup().uncaughtException(Thread.currentThread(), e);
         } finally {
-            synchronized (monitor) {
-                monitor.notify();
-            }
+            context.notifyStartup();
         }
     }
 }

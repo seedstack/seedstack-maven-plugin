@@ -14,7 +14,7 @@ import org.apache.maven.plugins.annotations.Execute;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
-import org.seedstack.maven.runnables.ToolLauncherRunnable;
+import org.seedstack.maven.runnables.ToolRunnable;
 
 /**
  * Defines the tool goal. This goal runs a Seed tool specified with by the "tool" property.
@@ -26,7 +26,8 @@ import org.seedstack.maven.runnables.ToolLauncherRunnable;
 public class ToolMojo extends AbstractExecutableMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        String[] args = getArgs();
+        Context context = getContext();
+        String[] args = context.getArgs();
         if (args.length == 0 || args[0] == null || args[0].isEmpty()) {
             throw new MojoExecutionException(
                     "No tool specified: specify the tool name as the first argument in the 'args' property");
@@ -35,7 +36,16 @@ public class ToolMojo extends AbstractExecutableMojo {
         String[] shiftedArgs = new String[args.length - 1];
         System.arraycopy(args, 1, shiftedArgs, 0, args.length - 1);
 
-        execute(new ToolLauncherRunnable(toolName, shiftedArgs, getMonitor(), getLog()), false);
+        execute(new ToolRunnable(toolName, new Context(
+                shiftedArgs,
+                context.getLog(),
+                context.getClassesDirectory(),
+                context.getTestClassesDirectory(),
+                context.getMavenProject(),
+                context.getMavenSession(),
+                context.getBuildPluginManager()
+        )), false);
+
         waitForShutdown();
     }
 }

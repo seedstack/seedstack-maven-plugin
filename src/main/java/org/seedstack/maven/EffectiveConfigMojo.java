@@ -14,7 +14,7 @@ import org.apache.maven.plugins.annotations.Execute;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
-import org.seedstack.maven.runnables.ToolLauncherRunnable;
+import org.seedstack.maven.runnables.ToolRunnable;
 
 /**
  * Defines the effective-config goal. This goal runs the effective-config Seed tool which dumps the effective
@@ -27,7 +27,7 @@ import org.seedstack.maven.runnables.ToolLauncherRunnable;
 public class EffectiveConfigMojo extends AbstractExecutableMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        execute(new ToolLauncherRunnable("effective-config", getArgs(), getMonitor(), getLog()), false);
+        execute(new ToolRunnable("effective-config", getContext()), false);
         waitForShutdown();
     }
 }

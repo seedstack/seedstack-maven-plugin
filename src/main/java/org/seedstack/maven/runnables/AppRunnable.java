@@ -10,23 +10,18 @@ package org.seedstack.maven.runnables;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.Arrays;
-import org.apache.maven.plugin.logging.Log;
+import org.seedstack.maven.Context;
 import org.seedstack.maven.SeedStackUtils;
 
-public class DefaultLauncherRunnable implements Runnable {
-    private final String[] args;
-    private final Object launchMonitor;
-    private final Object refreshMonitor;
-    private final Log log;
+public class AppRunnable implements Runnable {
+    private final Object refreshMonitor = new Object();
+    private final Context context;
     private ClassLoader classLoader;
     private ThreadGroup threadGroup;
     private Object seedLauncher;
 
-    public DefaultLauncherRunnable(String[] args, Object monitor, Log log) {
-        this.args = args == null ? null : args.clone();
-        this.launchMonitor = monitor;
-        this.refreshMonitor = new Object();
-        this.log = log;
+    public AppRunnable(Context context) {
+        this.context = context;
     }
 
     public void run() {
@@ -39,22 +34,20 @@ public class DefaultLauncherRunnable implements Runnable {
                 @Override
                 public void run() {
                     try {
-                        System.out.println();
                         SeedStackUtils.shutdown(seedLauncher);
                     } catch (Exception e) {
-                        log.error("SeedStack application failed to shutdown properly", e);
+                        context.getLog().error("SeedStack application failed to shutdown properly", e);
                     }
                 }
             });
 
-            log.info("Launching SeedStack application with arguments " + Arrays.toString(args));
+            String[] args = context.getArgs();
+            context.getLog().info("Launching SeedStack application with arguments " + Arrays.toString(args));
             SeedStackUtils.launch(seedLauncher, args);
         } catch (Exception e) {
             threadGroup.uncaughtException(Thread.currentThread(), e);
         } finally {
-            synchronized (launchMonitor) {
-                launchMonitor.notify();
-            }
+            context.notifyStartup();
         }
     }
 
@@ -75,21 +68,14 @@ public class DefaultLauncherRunnable implements Runnable {
                     }
 
                     // Notify end of refresh
-                    synchronized (refreshMonitor) {
-                        refreshMonitor.notify();
-                    }
+                    context.notifyStartup();
                 }
             }, "refresh").start();
         }
 
         // Wait for refresh complete
-        synchronized (refreshMonitor) {
-            try {
-                refreshMonitor.wait();
-            } catch (InterruptedException e) {
-                log.warn("Failed to wait until refresh is complete");
-            }
-        }
+        context.waitForStartup();
+
         if (refreshException[0] != null) {
             throw refreshException[0];
         }

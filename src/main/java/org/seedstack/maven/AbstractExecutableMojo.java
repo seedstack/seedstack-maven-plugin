@@ -19,45 +19,30 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Resource;
-import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
-import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.util.cli.CommandLineUtils;
 
 /**
  * Provides a common base for mojos that run SeedStack applications.
  */
 public abstract class AbstractExecutableMojo extends AbstractSeedStackMojo {
-    @Parameter(defaultValue = "${project}", required = true, readonly = true)
-    private MavenProject project;
-    @Parameter(defaultValue = "${session}", required = true, readonly = true)
-    private MavenSession mavenSession;
-    @Component
-    private BuildPluginManager buildPluginManager;
-    @Parameter(defaultValue = "${project.build.outputDirectory}", required = true)
-    private File classesDirectory;
-    @Parameter(defaultValue = "${project.build.testOutputDirectory}", required = true)
-    private File testClassesDirectory;
-    @Parameter(property = "args")
-    private String args;
     private final IsolatedThreadGroup isolatedThreadGroup = new IsolatedThreadGroup("seed-app");
-    private final Object monitor = new Object();
 
     @SuppressFBWarnings(value = {"UW_UNCOND_WAIT", "WA_NOT_IN_LOOP"}, justification = "Cannot know when the "
             + "application is started")
-    protected void execute(Runnable runnable, boolean testMode) throws MojoExecutionException, MojoFailureException {
+    protected void execute(Runnable runnable, boolean testMode) throws MojoExecutionException {
         File[] classPathFiles = getClassPathFiles(testMode);
 
         // Set the system property for proper detection of classpath
         System.setProperty("java.class.path", buildCpProperty(classPathFiles));
 
         // Start the launcher thread
-        ClassLoader classLoader = buildClassLoader(classPathFiles);
+        ClassLoader classLoader;
+        try {
+            classLoader = buildClassLoader(classPathFiles);
+        } catch (MalformedURLException e) {
+            throw new MojoExecutionException("Unable to build the classloader", e);
+        }
 
         // Create an isolated thread
         Thread bootstrapThread = new Thread(isolatedThreadGroup, runnable, "main");
@@ -65,85 +50,23 @@ public abstract class AbstractExecutableMojo extends AbstractSeedStackMojo {
         bootstrapThread.start();
 
         // Wait for the application to launch
-        synchronized (monitor) {
-            try {
-                monitor.wait();
-            } catch (InterruptedException e) {
-                throw new MojoExecutionException("Interrupted while waiting for Seed");
-            }
-        }
+        getContext().waitForStartup();
 
         // Check for any uncaught exception
         synchronized (isolatedThreadGroup) {
             if (isolatedThreadGroup.uncaughtException != null) {
-                throw new MojoExecutionException("An exception occurred while executing Seed",
+                throw new MojoExecutionException("An exception occurred while executing SeedStack application",
                         isolatedThreadGroup.uncaughtException);
             }
         }
     }
 
-    MavenSession getMavenSession() {
-        return mavenSession;
-    }
-
-    BuildPluginManager getBuildPluginManager() {
-        return buildPluginManager;
-    }
-
-    MavenProject getProject() {
-        return project;
-    }
-
-    File getClassesDirectory() {
-        return classesDirectory;
-    }
-
-    File getTestClassesDirectory() {
-        return testClassesDirectory;
-    }
-
-    Object getMonitor() {
-        return monitor;
-    }
-
-    String[] getArgs() throws MojoExecutionException {
-        try {
-            return CommandLineUtils.translateCommandline(args);
-        } catch (Exception e) {
-            throw new MojoExecutionException("Failed to parse arguments", e);
-        }
-    }
-
-    URLClassLoader getClassLoader(final URL[] classPathUrls) {
+    URLClassLoader createClassLoader(final URL[] classPathUrls) {
         return AccessController.doPrivileged(new PrivilegedAction<URLClassLoader>() {
             public URLClassLoader run() {
                 return new URLClassLoader(classPathUrls);
             }
         });
-    }
-
-    private ClassLoader buildClassLoader(File[] classPathFiles) throws MojoExecutionException {
-        URL[] classPathUrls = new URL[classPathFiles.length];
-        for (int i = 0; i < classPathFiles.length; i++) {
-            try {
-                classPathUrls[i] = classPathFiles[i].toURI().toURL();
-            } catch (MalformedURLException e) {
-                throw new MojoExecutionException("Unable to create URL from " + classPathFiles[i]);
-            }
-        }
-        return getClassLoader(classPathUrls);
-    }
-
-    private String buildCpProperty(File[] classPathFiles) {
-        StringBuilder stringBuilder = new StringBuilder();
-        for (int i = 0; i < classPathFiles.length; i++) {
-            File classPathFile = classPathFiles[i];
-            stringBuilder.append(classPathFile);
-            if (i < classPathFiles.length - 1) {
-                stringBuilder.append(File.pathSeparator);
-            }
-        }
-        return stringBuilder.toString();
     }
 
     void waitForShutdown() {
@@ -180,34 +103,32 @@ public abstract class AbstractExecutableMojo extends AbstractSeedStackMojo {
         return java.util.Arrays.copyOf(threads, n);
     }
 
-    private File[] getClassPathFiles(boolean testMode) throws MojoExecutionException {
+    private File[] getClassPathFiles(boolean testMode) {
         List<File> files = new ArrayList<>();
 
-        try {
-            if (testMode) {
-                // Project test resources
-                addResources(this.testClassesDirectory, this.project.getTestResources(), files);
+        if (testMode) {
+            // Project test resources
+            addResources(getContext().getTestClassesDirectory(),
+                    getContext().getMavenProject().getTestResources(),
+                    files);
 
-                // Project test classes
-                files.add(this.testClassesDirectory);
-            }
-
-            // Project resources
-            addResources(this.classesDirectory, this.project.getResources(), files);
-
-            // Project classes
-            files.add(this.classesDirectory);
-
-            // Project dependencies (scope is dependent upon the @Mojo annotation and the already executed phase)
-            addArtifacts(this.project.getArtifacts(), files);
-        } catch (MalformedURLException e) {
-            throw new MojoExecutionException("Unable to build classpath", e);
+            // Project test classes
+            files.add(getContext().getTestClassesDirectory());
         }
 
-        return files.toArray(new File[files.size()]);
+        // Project resources
+        addResources(getContext().getClassesDirectory(), getContext().getMavenProject().getResources(), files);
+
+        // Project classes
+        files.add(getContext().getClassesDirectory());
+
+        // Project dependencies (scope is dependent upon the @Mojo annotation and the already executed phase)
+        addArtifacts(getContext().getMavenProject().getArtifacts(), files);
+
+        return files.toArray(new File[0]);
     }
 
-    private void addArtifacts(Collection<Artifact> artifacts, List<File> files) throws MalformedURLException {
+    private void addArtifacts(Collection<Artifact> artifacts, List<File> files) {
         for (Artifact artifact : artifacts) {
             File file = artifact.getFile();
             if (file.getName().endsWith(".jar")) {
@@ -217,7 +138,7 @@ public abstract class AbstractExecutableMojo extends AbstractSeedStackMojo {
     }
 
     private void addResources(File classesDirectory, List<Resource> resources,
-            List<File> files) throws MalformedURLException {
+            List<File> files) {
         for (Resource resource : resources) {
             File directory = new File(resource.getDirectory());
             files.add(directory);
@@ -244,6 +165,26 @@ public abstract class AbstractExecutableMojo extends AbstractSeedStackMojo {
                 }
             }
         }
+    }
+
+    private ClassLoader buildClassLoader(File[] classPathFiles) throws MalformedURLException {
+        URL[] classPathUrls = new URL[classPathFiles.length];
+        for (int i = 0; i < classPathFiles.length; i++) {
+            classPathUrls[i] = classPathFiles[i].toURI().toURL();
+        }
+        return createClassLoader(classPathUrls);
+    }
+
+    private String buildCpProperty(File[] classPathFiles) {
+        StringBuilder stringBuilder = new StringBuilder();
+        for (int i = 0; i < classPathFiles.length; i++) {
+            File classPathFile = classPathFiles[i];
+            stringBuilder.append(classPathFile);
+            if (i < classPathFiles.length - 1) {
+                stringBuilder.append(File.pathSeparator);
+            }
+        }
+        return stringBuilder.toString();
     }
 
     private class IsolatedThreadGroup extends ThreadGroup {

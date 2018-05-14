@@ -14,7 +14,7 @@ import org.apache.maven.plugins.annotations.Execute;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
-import org.seedstack.maven.runnables.ToolLauncherRunnable;
+import org.seedstack.maven.runnables.ToolRunnable;
 
 /**
  * Defines the crypt goal. This goal runs the crypt Seed tool which crypts the given argument using a key/pair in
@@ -26,7 +26,7 @@ import org.seedstack.maven.runnables.ToolLauncherRunnable;
 public class CryptMojo extends AbstractExecutableMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        execute(new ToolLauncherRunnable("crypt", getArgs(), getMonitor(), getLog()), false);
+        execute(new ToolRunnable("crypt", getContext()), false);
         waitForShutdown();
     }
 }

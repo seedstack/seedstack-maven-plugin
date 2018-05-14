@@ -46,12 +46,10 @@ import org.apache.maven.archetype.ArchetypeManager;
 import org.apache.maven.archetype.catalog.Archetype;
 import org.apache.maven.archetype.catalog.ArchetypeCatalog;
 import org.apache.maven.execution.MavenSession;
-import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.seedstack.maven.components.inquirer.Inquirer;
 import org.seedstack.maven.components.inquirer.InquirerException;
@@ -73,12 +71,6 @@ public class GenerateMojo extends AbstractSeedStackMojo {
     private static final String SEEDSTACK_ORG = "http://seedstack.org/maven/";
     private PebbleEngine stringTemplateEngine;
     private PebbleEngine fileTemplateEngine;
-    @Parameter(defaultValue = "${project}", required = true, readonly = true)
-    private MavenProject mavenProject;
-    @Parameter(defaultValue = "${session}", required = true, readonly = true)
-    private MavenSession mavenSession;
-    @Component
-    private BuildPluginManager buildPluginManager;
     @Component
     private ArtifactResolver artifactResolver;
     @Component
@@ -95,6 +87,8 @@ public class GenerateMojo extends AbstractSeedStackMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
+        MavenSession mavenSession = getContext().getMavenSession();
+        MavenProject mavenProject = getContext().getMavenProject();
         if (mavenSession.getUserProperties().getProperty("basicPrompt") == null) {
             this.basicMode = autodetectBasicMode();
         } else {
@@ -102,7 +96,7 @@ public class GenerateMojo extends AbstractSeedStackMojo {
         }
         if (!basicMode) {
             getLog().info(
-                    "Hint: if enhanced prompt has issues on your system, try basic prompt by adding \"-DbasicPrompt\""
+                    "If enhanced prompt has issues on your system, try basic prompt by adding \"-DbasicPrompt\""
                             + " to your command line");
         }
 
@@ -233,7 +227,7 @@ public class GenerateMojo extends AbstractSeedStackMojo {
                         element(name("archetypeVersion"), archetypeVersion)
                 ),
 
-                executionEnvironment(mavenProject, mavenSession, buildPluginManager));
+                executionEnvironment(mavenProject, mavenSession, getContext().getBuildPluginManager()));
 
         final File projectDir = new File("." + File.separator + artifactId);
         if (projectDir.exists() && projectDir.canWrite()) {
@@ -431,15 +425,6 @@ public class GenerateMojo extends AbstractSeedStackMojo {
     }
 
     private boolean autodetectBasicMode() {
-        String osType = System.getenv("OSTYPE");
-        String cygwin = System.getenv("CYGWIN");
-        if (cygwin != null) {
-            return true;
-        } else if (osType != null && !osType.isEmpty()) {
-            if (osType.startsWith("cygwin")) {
-                return true;
-            }
-        }
-        return false;
+        return Context.isCygwin() || Context.isMingwXterm();
     }
 }

@@ -20,12 +20,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.maven.plugin.logging.Log;
-import sun.misc.Resource;
-import sun.misc.URLClassPath;
 
 public class ReloadingClassLoader extends URLClassLoader {
     private final AccessControlContext acc = AccessController.getContext();
-    private final URLClassPath ucp;
     private final Map<String, DisposableClassLoader> classLoaders = new HashMap<>();
     private final Log log;
     private final List<String> sourceRoots;
@@ -33,7 +30,6 @@ public class ReloadingClassLoader extends URLClassLoader {
     public ReloadingClassLoader(Log log, URL[] urls, List<String> sourceRoots) {
         super(urls);
         this.log = log;
-        this.ucp = new URLClassPath(urls);
         this.sourceRoots = sourceRoots;
     }
 
@@ -98,14 +94,9 @@ public class ReloadingClassLoader extends URLClassLoader {
         try {
             result = AccessController.doPrivileged(
                     new PrivilegedExceptionAction<DisposableClassLoader>() {
-                        public DisposableClassLoader run() throws ClassNotFoundException {
-                            String path = name.replace('.', '/').concat(".class");
-                            Resource res = ucp.getResource(path, false);
-                            if (res != null) {
-                                return new DisposableClassLoader(ReloadingClassLoader.this, name, res);
-                            } else {
-                                return null;
-                            }
+                        public DisposableClassLoader run() {
+                            log.debug("Creating a disposable class loader for " + name);
+                            return new DisposableClassLoader(ReloadingClassLoader.this, name, getURLs());
                         }
                     }, acc);
         } catch (java.security.PrivilegedActionException pae) {
