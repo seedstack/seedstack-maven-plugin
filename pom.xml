@@ -34,7 +34,7 @@
         <bintray.package>seedstack-maven-plugin</bintray.package>
 
         <compatibility.skip>true</compatibility.skip>
-        <jetty-server.version>8.1.8.v20121106</jetty-server.version>
+        <jetty-server.version>8.2.0.v20160908</jetty-server.version>
     </properties>
 
     <build>

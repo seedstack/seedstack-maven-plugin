@@ -62,35 +62,6 @@ public class WatchMojo extends AbstractExecutableMojo {
         this.appRunnable = new AppRunnable(getContext());
         execute(appRunnable, false);
 
-        Runtime.getRuntime().addShutdownHook(new Thread("watch-shutdown") {
-            @Override
-            public void run() {
-                if (lrServer != null) {
-                    try {
-                        lrServer.stop();
-                    } catch (Exception e) {
-                        getLog().warn("Unable to stop LiveReload server", e);
-                    }
-                }
-
-                sourceWatcher.stop();
-                sourceWatcherThread.interrupt();
-                try {
-                    sourceWatcherThread.join(1000);
-                } catch (InterruptedException e) {
-                    getLog().warn("Unable to stop the source watcher", e);
-                }
-
-                resourceWatcher.stop();
-                resourceWatcherThread.interrupt();
-                try {
-                    resourceWatcherThread.join(1000);
-                } catch (InterruptedException e) {
-                    getLog().warn("Unable to stop the resource watcher", e);
-                }
-            }
-        });
-
         // Start LiveReload server
         startLiveReload();
 
@@ -100,6 +71,13 @@ public class WatchMojo extends AbstractExecutableMojo {
 
         // Wait for the app to end
         waitForShutdown();
+
+        // Stop the LiveReload server
+        stopLiveReload();
+
+        // Stop the watchers
+        stopWatcher(sourceWatcher, sourceWatcherThread);
+        stopWatcher(resourceWatcher, resourceWatcherThread);
     }
 
     private void startLiveReload() {
@@ -109,6 +87,27 @@ public class WatchMojo extends AbstractExecutableMojo {
             lrServer.start();
         } catch (Exception e) {
             getLog().error("Unable to start LiveReload server", e);
+        }
+    }
+
+    private void stopLiveReload() {
+        if (lrServer != null) {
+            try {
+                getLog().info("Stopping LiveReload server");
+                lrServer.stop();
+            } catch (Exception e) {
+                getLog().warn("Unable to stop LiveReload server", e);
+            }
+        }
+    }
+
+    private void stopWatcher(DirectoryWatcher watcher, Thread watcherThread) {
+        watcher.stop();
+        watcherThread.interrupt();
+        try {
+            watcherThread.join(1000);
+        } catch (InterruptedException e) {
+            getLog().warn("Unable to stop a watcher", e);
         }
     }
 

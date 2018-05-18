@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 package org.seedstack.maven.watcher;
 
 import java.io.File;
@@ -21,7 +22,7 @@ public class ResourceChangeListener implements FileChangeListener {
     @Override
     public void onChange(Set<FileEvent> fileEvents) {
         boolean configChanged = false;
-        watchMojo.getLog().info("Resource changes detected");
+        watchMojo.getLog().info("Resource change(s) detected");
 
         for (FileEvent fileEvent : fileEvents) {
             if (fileEvent.getKind() == FileEvent.Kind.CREATE) {
@@ -38,9 +39,9 @@ public class ResourceChangeListener implements FileChangeListener {
         }
 
         if (configChanged) {
+            // Wait for the application to notice the change
             watchMojo.getLog()
                     .info("A configuration file has changed, waiting for the application to notice the change");
-            // Wait for the application to notice the change
             try {
                 Thread.sleep(2000);
             } catch (InterruptedException e) {

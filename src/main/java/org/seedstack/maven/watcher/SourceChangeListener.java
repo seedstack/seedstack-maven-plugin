@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 package org.seedstack.maven.watcher;
 
 import static org.twdata.maven.mojoexecutor.MojoExecutor.artifactId;
@@ -27,8 +28,8 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
-import org.seedstack.maven.WatchMojo;
 import org.seedstack.maven.Context;
+import org.seedstack.maven.WatchMojo;
 
 public class SourceChangeListener implements FileChangeListener {
     private static final String COMPILATION_FAILURE_EXCEPTION =
@@ -73,7 +74,7 @@ public class SourceChangeListener implements FileChangeListener {
             analyzeEvents(fileEvents, compiledFilesToRemove, compiledFilesToUpdate);
 
             if (!compiledFilesToRemove.isEmpty() || !compiledFilesToUpdate.isEmpty()) {
-                watchMojo.getLog().info("Source changes detected");
+                watchMojo.getLog().info("Source change(s) detected");
 
                 try {
                     // Invalidate classes from source files that are gone

@@ -96,6 +96,8 @@ public class ReloadingClassLoader extends URLClassLoader {
                     new PrivilegedExceptionAction<DisposableClassLoader>() {
                         public DisposableClassLoader run() {
                             log.debug("Creating a disposable class loader for " + name);
+                            // TODO: could be optimized by avoid giving all URLs to the disposable classloader
+                            // (only the one which effectively contains the class)
                             return new DisposableClassLoader(ReloadingClassLoader.this, name, getURLs());
                         }
                     }, acc);
