@@ -114,7 +114,7 @@ public class SourceChangeListener implements FileChangeListener {
             if (toLog == null || !toLog.getClass().getName().equals(COMPILATION_FAILURE_EXCEPTION)) {
                 toLog = e;
             }
-            watchMojo.getLog().warn("An error occurred during application refresh, ignoring changes", toLog);
+            watchMojo.getLog().warn("An error occurred during application refresh, ignoring source changes", toLog);
         }
     }
 

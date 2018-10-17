@@ -57,6 +57,7 @@ public class WatchMojo extends AbstractExecutableMojo {
 
         setupResourceWatcher(mavenProject);
 
+        // Force config watching
         System.setProperty("seedstack.config.config.watch", "true");
 
         this.appRunnable = new AppRunnable(getContext());
@@ -113,7 +114,7 @@ public class WatchMojo extends AbstractExecutableMojo {
 
     private void setupResourceWatcher(MavenProject mavenProject) throws MojoExecutionException {
         try {
-            this.resourceWatcher = new DirectoryWatcher(getLog(), new ResourceChangeListener(this));
+            this.resourceWatcher = new DirectoryWatcher(getLog(), new ResourceChangeListener(this, getContext()));
         } catch (IOException e) {
             throw new MojoExecutionException("Unable to create resource watcher", e);
         }

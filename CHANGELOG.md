@@ -1,3 +1,7 @@
+# Version 2.7.2 (2018-10-18)
+
+* [fix] In watch goal, resources (including static resources under `META-INF/resources`) are now properly updated on change.
+
 # Version 2.7.1 (2018-05-18)
 
 * [new] In watch goal, trigger a LiveReload (without app refresh) when a resource changes.
