@@ -1,3 +1,8 @@
+# Version 2.7.3 (2018-12-04)
+
+* [chg] Built and tested with OpenJDK 11 (minimum Java version still being 8).
+* [fix] Properly handle resource deletion.
+
 # Version 2.7.2 (2018-10-18)
 
 * [fix] In watch goal, resources (including static resources under `META-INF/resources`) are now properly updated on change.

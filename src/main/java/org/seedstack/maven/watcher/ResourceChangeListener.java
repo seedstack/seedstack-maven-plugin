@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2013-2016, The SeedStack authors <http://seedstack.org>
+/*
+ * Copyright © 2013-2018, The SeedStack authors <http://seedstack.org>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -18,41 +18,54 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.plugin;
 import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
+import org.apache.maven.model.Resource;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.seedstack.maven.Context;
 import org.seedstack.maven.WatchMojo;
 
-public class ResourceChangeListener implements FileChangeListener {
-    private final WatchMojo watchMojo;
-    private final Context context;
-
+public class ResourceChangeListener extends AbstractFileChangeListener {
     public ResourceChangeListener(WatchMojo watchMojo, Context context) {
-        this.watchMojo = watchMojo;
-        this.context = context;
+        super(watchMojo, context);
     }
 
     @Override
-    public void onChange(Set<FileEvent> fileEvents) {
+    protected void refresh(Set<FileEvent> fileEvents) {
         boolean configChanged = false;
-        boolean staticResourceChanged = false;
+        List<File> resourcesToDelete = new ArrayList<>();
         watchMojo.getLog().info("Resource change(s) detected");
 
-        for (FileEvent fileEvent : fileEvents) {
-            if (fileEvent.getKind() == FileEvent.Kind.CREATE) {
-                watchMojo.getLog().debug("NEW: " + fileEvent.getFile().getPath());
-            } else if (fileEvent.getKind() == FileEvent.Kind.MODIFY) {
-                watchMojo.getLog().debug("MODIFIED: " + fileEvent.getFile().getPath());
-            } else if (fileEvent.getKind() == FileEvent.Kind.DELETE) {
-                watchMojo.getLog().debug("DELETED: " + fileEvent.getFile().getPath());
-            }
-
-            if (isConfigFile(fileEvent.getFile())) {
-                configChanged = true;
-            }
-        }
-
         try {
+            for (FileEvent fileEvent : fileEvents) {
+                File changedFile = fileEvent.getFile();
+                if (fileEvent.getKind() == FileEvent.Kind.CREATE) {
+                    watchMojo.getLog().debug("NEW: " + changedFile.getPath());
+                } else if (fileEvent.getKind() == FileEvent.Kind.MODIFY) {
+                    watchMojo.getLog().debug("MODIFIED: " + changedFile.getPath());
+                } else if (fileEvent.getKind() == FileEvent.Kind.DELETE) {
+                    watchMojo.getLog().debug("DELETED: " + changedFile.getPath());
+                    try {
+                        resourcesToDelete.add(resolveResourceFile(changedFile));
+                    } catch (IOException e) {
+                        throw new MojoExecutionException("Unable to resolve target file for resource " + changedFile.getAbsolutePath());
+                    }
+                }
+
+                if (isConfigFile(changedFile)) {
+                    configChanged = true;
+                }
+            }
+
+            for (File file : resourcesToDelete) {
+                watchMojo.getLog().info("Deleting missing resource " + file.getAbsolutePath());
+                if (!file.delete()) {
+                    watchMojo.getLog().warn("Unable to delete resource " + file.getAbsolutePath());
+                }
+            }
+            watchMojo.getLog().info("Updating resources");
             copyResources();
 
             if (configChanged) {
@@ -92,5 +105,29 @@ public class ResourceChangeListener implements FileChangeListener {
                         context.getMavenSession(),
                         context.getBuildPluginManager())
         );
+    }
+
+    private File resolveResourceFile(File changedFile) throws IOException {
+        String outputDirectory = context.getMavenProject().getBuild().getOutputDirectory();
+        for (Resource resource : context.getMavenProject().getResources()) {
+            try {
+                String resourceDir = new File(resource.getDirectory()).getCanonicalPath();
+                String filePath = changedFile.getCanonicalPath();
+                if (filePath.startsWith(resourceDir)) {
+                    String relativePath = filePath.substring(resourceDir.length());
+                    String targetPath = resource.getTargetPath();
+                    File targetDir;
+                    if (targetPath == null || targetPath.isEmpty()) {
+                        targetDir = new File(outputDirectory);
+                    } else {
+                        targetDir = new File(outputDirectory, targetPath);
+                    }
+                    return new File(targetDir, relativePath);
+                }
+            } catch (IOException e) {
+                throw new IOException("Unable to resolve resource file path: " + changedFile.getAbsolutePath(), e);
+            }
+        }
+        return null;
     }
 }
