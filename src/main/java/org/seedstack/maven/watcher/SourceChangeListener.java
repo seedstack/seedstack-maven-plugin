@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2013-2016, The SeedStack authors <http://seedstack.org>
+/*
+ * Copyright © 2013-2018, The SeedStack authors <http://seedstack.org>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -22,8 +22,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Semaphore;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -31,42 +29,15 @@ import org.objectweb.asm.Opcodes;
 import org.seedstack.maven.Context;
 import org.seedstack.maven.WatchMojo;
 
-public class SourceChangeListener implements FileChangeListener {
+public class SourceChangeListener extends AbstractFileChangeListener {
     private static final String COMPILATION_FAILURE_EXCEPTION =
             "org.apache.maven.plugin.compiler.CompilationFailureException";
-    private final WatchMojo watchMojo;
-    private final Context context;
-    private final Semaphore semaphore = new Semaphore(1);
-    private final ArrayBlockingQueue<FileEvent> pending = new ArrayBlockingQueue<>(10000);
 
     public SourceChangeListener(WatchMojo watchMojo, Context context) {
-        this.watchMojo = watchMojo;
-        this.context = context;
+        super(watchMojo, context);
     }
 
-    @Override
-    public void onChange(Set<FileEvent> fileEvents) {
-        pending.addAll(fileEvents);
-        while (!pending.isEmpty()) {
-            boolean permit = false;
-            try {
-                permit = semaphore.tryAcquire();
-                if (permit) {
-                    HashSet<FileEvent> fileEventsToProcess = new HashSet<>();
-                    pending.drainTo(fileEventsToProcess);
-                    refresh(fileEventsToProcess);
-                } else {
-                    pending.addAll(fileEvents);
-                }
-            } finally {
-                if (permit) {
-                    semaphore.release();
-                }
-            }
-        }
-    }
-
-    private void refresh(Set<FileEvent> fileEvents) {
+    protected void refresh(Set<FileEvent> fileEvents) {
         try {
             Set<File> compiledFilesToRemove = new HashSet<>();
             Set<File> compiledFilesToUpdate = new HashSet<>();
@@ -78,7 +49,11 @@ public class SourceChangeListener implements FileChangeListener {
 
                 try {
                     // Invalidate classes from source files that are gone
-                    watchMojo.invalidateClasses(analyzeClasses(compiledFilesToRemove));
+                    Set<String> classesToInvalidate = analyzeClasses(compiledFilesToRemove);
+                    for (String s : classesToInvalidate) {
+                        watchMojo.getLog().info("Invaliding updated class " + s);
+                    }
+                    watchMojo.invalidateClasses(classesToInvalidate);
                 } catch (RefreshException e) {
                     watchMojo.getLog().info("Cannot detect removed classes, invalidating all classes", e);
                     watchMojo.invalidateAllClasses();
