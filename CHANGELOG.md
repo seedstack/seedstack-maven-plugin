@@ -1,3 +1,7 @@
+# Version 2.7.4 (2019-03-11)
+
+* [fix] Preserve classpath order in packaged capsules (CLI having precedence over POM having precedence over application manifest).
+
 # Version 2.7.3 (2018-12-04)
 
 * [chg] Built and tested with OpenJDK 11 (minimum Java version still being 8).

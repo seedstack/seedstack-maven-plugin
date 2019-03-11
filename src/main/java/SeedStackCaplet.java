@@ -5,20 +5,24 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 import java.io.File;
 import java.net.URLDecoder;
 import java.nio.file.Path;
 import java.security.CodeSource;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 
 public class SeedStackCaplet extends Capsule {
-    private static final Map.Entry<String, List<String>> RAW_ATTR_APP_CLASS_PATH = ATTRIBUTE("App-Class-Path", T_LIST(T_STRING()), null, true, "A list of entries that are added to the classpath on runtime");
+    private static final Map.Entry<String, List<String>> RAW_ATTR_APP_CLASS_PATH = ATTRIBUTE("App-Class-Path",
+            T_LIST(T_STRING()),
+            null,
+            true,
+            "A list of entries that are added to the classpath on runtime");
     private static final String CLASSPATH = "capsule.classpath";
     private final String homePath = getHomePath();
     private final String startupPath = getStartupPath();
@@ -60,19 +64,23 @@ public class SeedStackCaplet extends Capsule {
     @SuppressWarnings("unchecked")
     protected <T> T attribute(Map.Entry<String, T> attr) {
         if (attr.getKey().equals(RAW_ATTR_APP_CLASS_PATH.getKey())) {
-            final List<String> rawClasspath = new ArrayList<>(super.attribute(RAW_ATTR_APP_CLASS_PATH));
-            final Set<Object> resolvedClasspath = new HashSet<>();
+            final List<Object> resolvedClasspath = new ArrayList<>();
 
-            resolvedClasspath.add(lookup("*.jar", ATTR_APP_CLASS_PATH));
-
+            // Runtime classpath
             String runtimeClasspath = System.getProperty(CLASSPATH);
             if (runtimeClasspath != null && !runtimeClasspath.isEmpty()) {
-                Collections.addAll(rawClasspath, runtimeClasspath.split(File.pathSeparator));
+                for (String rawPath : runtimeClasspath.split(File.pathSeparator)) {
+                    resolvedClasspath.add(resolvePath(rawPath));
+                }
             }
 
-            for (String rawPath : rawClasspath) {
-                resolvedClasspath.addAll(resolvePath(rawPath));
+            // Static POM classpath
+            for (String rawPath : super.attribute(RAW_ATTR_APP_CLASS_PATH)) {
+                resolvedClasspath.add(resolvePath(rawPath));
             }
+
+            // App classpath
+            resolvedClasspath.add(lookup("*.jar", ATTR_APP_CLASS_PATH));
 
             return (T) new ArrayList<>(resolvedClasspath);
         } else {
@@ -80,8 +88,8 @@ public class SeedStackCaplet extends Capsule {
         }
     }
 
-    private Set<Path> resolvePath(String path) {
-        HashSet<Path> result = new HashSet<>();
+    private List<Path> resolvePath(String path) {
+        HashSet<Path> result = new LinkedHashSet<>();
 
         if (path.startsWith("~")) {
             if (homePath == null) {
@@ -114,7 +122,7 @@ public class SeedStackCaplet extends Capsule {
             result.add(normalizePath(file));
         }
 
-        return result;
+        return new ArrayList<>(result);
     }
 
     private Path normalizePath(File file) {
