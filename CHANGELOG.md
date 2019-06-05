@@ -1,3 +1,7 @@
+# Version 2.7.5 (2019-06-??)
+
+* [new] Add specific goal for `diag` tool.
+
 # Version 2.7.4 (2019-03-11)
 
 * [fix] Preserve classpath order in packaged capsules (CLI having precedence over POM having precedence over application manifest).
