@@ -1,4 +1,4 @@
-# Version 2.7.5 (2019-09-06)
+# Version 2.7.5 (2019-09-16)
 
 * [new] Add specific goal for `diag` tool.
 
