@@ -69,7 +69,7 @@ import com.mitchellbosecke.pebble.template.PebbleTemplate;
 public class GenerateMojo extends AbstractSeedStackMojo {
     private static final String ARCHETYPE_PLUGIN_GROUP_ID = "org.apache.maven.plugins";
     private static final String ARCHETYPE_PLUGIN_ARTIFACT_ID = "maven-archetype-plugin";
-    private static final String SEEDSTACK_ORG = "https://seedstack.org/maven/";
+    private static final String SEEDSTACK_ORG = "http://seedstack.org/maven/";
     private PebbleEngine stringTemplateEngine;
     private PebbleEngine fileTemplateEngine;
     @Component
@@ -345,7 +345,8 @@ public class GenerateMojo extends AbstractSeedStackMojo {
 
         if (possibleTypes.isEmpty()) {
             getLog().info("No remote " + archetypeVersion + " archetype found, trying the central catalog");
-            possibleTypes.addAll(findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getRemoteCatalog()));
+            possibleTypes.addAll(
+                    findArchetypes(archetypeGroupId, archetypeVersion, archetypeManager.getRemoteCatalog("https://repo.maven.apache.org/maven2")));
         }
         if (possibleTypes.isEmpty()) {
             getLog().info("No remote or central " + archetypeVersion + " archetype found, trying the local catalog");
