@@ -1,3 +1,8 @@
+# Version 2.7.6 (2020-11-30)
+
+* [fix] Replace plain HTTP call to central archetype catalog by an HTTPS call.
+* [fix] In `watch` goal, fix failure to hot-reload inner classes.
+
 # Version 2.7.5 (2019-09-16)
 
 * [new] Add specific goal for `diag` tool.

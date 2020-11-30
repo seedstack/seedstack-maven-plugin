@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013-2019, The SeedStack authors <http://seedstack.org>
+ * Copyright © 2013-2020, The SeedStack authors <http://seedstack.org>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,20 +9,25 @@ package org.seedstack.maven.classloader;
 
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.HashSet;
+import java.util.Set;
 
 class DisposableClassLoader extends URLClassLoader {
     private final ReloadingClassLoader reloadingClassLoader;
-    private final String name;
+    private final Set<String> names = new HashSet<>();
 
-    DisposableClassLoader(ReloadingClassLoader reloadingClassLoader, String name, URL[] urLs) {
+    DisposableClassLoader(ReloadingClassLoader reloadingClassLoader, URL[] urLs) {
         super(urLs, null);
         this.reloadingClassLoader = reloadingClassLoader;
-        this.name = name;
+    }
+
+    void addName(String name) {
+        names.add(name);
     }
 
     @Override
     public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-        if (this.name.equals(name)) {
+        if (this.names.contains(name)) {
             // Only load the class specific to this classloader
             synchronized (getClassLoadingLock(name)) {
                 // First, check if the class has already been loaded
