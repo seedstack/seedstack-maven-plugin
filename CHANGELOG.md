@@ -1,3 +1,7 @@
+# Version 2.8.0 (2021-05-05)
+
+* [new] A new `check` goal was added which validates SeedStack configuration and display potential issues with it. 
+
 # Version 2.7.6 (2020-11-30)
 
 * [fix] Replace plain HTTP call to central archetype catalog by an HTTPS call.
