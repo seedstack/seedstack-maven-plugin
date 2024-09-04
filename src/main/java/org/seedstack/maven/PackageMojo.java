@@ -110,7 +110,7 @@ public class PackageMojo extends AbstractSeedStackMojo {
             if (!success) throw new MojoFailureException("Unable to create output directory");
         }
 
-        getLog().info("Packaging SeedStack application using Capsule version " + capsuleVersion);
+        getLog().info("Packaging SeedStack application using built-in Capsule fork");
 
         File capsuleFile;
         try {
@@ -162,16 +162,8 @@ public class PackageMojo extends AbstractSeedStackMojo {
         return String.format("%s-capsule.jar", finalName);
     }
 
-    private void addCapsuleClasses(JarOutputStream jarOutputStream) throws IOException, ArtifactResolutionException {
-        ArtifactResult capsule = artifactResolver.resolveArtifact(mavenProject, CAPSULE_GROUP_ID, CAPSULE_ARTIFACT_ID, null, null, capsuleVersion);
-        JarInputStream capsuleJarInputStream = new JarInputStream(new FileInputStream(capsule.getArtifact().getFile()));
-
-        JarEntry entry;
-        while ((entry = capsuleJarInputStream.getNextJarEntry()) != null) {
-            if (entry.getName().equals(getClassFileName(CAPSULE_CLASS))) {
-                addToJar(entry.getName(), new ByteArrayInputStream(IOUtil.toByteArray(capsuleJarInputStream)), jarOutputStream);
-            }
-        }
+    private void addCapsuleClasses(JarOutputStream jarOutputStream) throws IOException {
+        addToJar(getClassFileName(CAPSULE_CLASS), Thread.currentThread().getContextClassLoader().getResourceAsStream(getClassFileName(CAPSULE_CLASS)), jarOutputStream);
         addToJar(getClassFileName(SEEDSTACK_CAPLET_CLASS), Thread.currentThread().getContextClassLoader().getResourceAsStream(getClassFileName(SEEDSTACK_CAPLET_CLASS)), jarOutputStream);
     }
 

@@ -1,3 +1,14 @@
+# Version 2.8.2 (2024-09-04)
+
+* [chg] Switch Capsule to our own internal fork.
+* [fix] Fix Capsule not retaining JVM args that are occurring multiple times with the same name (`add-opens` for now).
+* [fix] Updated JMX code in the Capsule to be compatible with Java 17+.
+
+# Version 2.8.1 (2024-01-19)
+
+* [chg] Switch Capsule dependency to `nextflow-io` fork.
+* [fix] Capsule was not launching with JRE that have 4 version numbers (x.y.z1.z2).
+
 # Version 2.8.0 (2021-05-05)
 
 * [new] A new `check` goal was added which validates SeedStack configuration and display potential issues with it. 
